@@ -1,0 +1,150 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE and Editor
+.idea
+.vscode
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# Environment files (never include in builds)
+.env
+.env.local
+.env.*.local
+*.env
+.envrc
+
+# Logs
+*.log
+logs/
+
+# Testing
+coverage/
+.coverage
+*.cover
+.hypothesis/
+
+# Documentation
+docs/_build/
+site/
+
+# Flutter/Dart
+frontend/.dart_tool/
+frontend/.packages
+frontend/.pub-cache/
+frontend/.pub/
+frontend/build/
+frontend/ios/Pods/
+frontend/ios/.symlinks/
+frontend/android/.gradle/
+frontend/android/app/debug/
+frontend/android/app/profile/
+frontend/android/app/release/
+frontend/*.iml
+frontend/local.properties
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+
+# Node.js (if any web components)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Secrets and credentials
+*.pem
+*.key
+*.crt
+*.p12
+credentials/
+secrets/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Build artifacts
+*.tar
+*.tar.gz
+*.zip
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.circleci/
+
+# Documentation
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+LICENSE
+docs/
+
+# Test fixtures and data
+tests/fixtures/
+test_data/
+*.fixture.json
+
+# Kubernetes configs (deploy separately)
+k8s/
+kubernetes/
+helm/
+
+# Terraform (infrastructure as code)
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Misc
+Makefile
+docker-compose.override.yml
+docker-compose.*.yml
+!docker-compose.yml

@@ -1,21 +1,25 @@
-/// Ctrl+Shift+Date - Settings Screen
+/// ctrl^date - Settings Screen
 /// User preferences and app settings
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../main.dart';
+import '../providers/auth_provider.dart';
+import '../router.dart';
 import '../theme.dart';
 
 /// Settings screen for user preferences
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // Mock settings - replace with actual state management
   String _timezone = 'America/New_York';
   String _weekStart = 'monday';
@@ -25,8 +29,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int _notificationLeadTime = 15;
   bool _notificationsEnabled = true;
   bool _aiSuggestionsEnabled = true;
-  bool _darkMode = false;
   double _streakThreshold = 0.8;
+  String _defaultCalendarView = 'day';
+  bool _eventRemindersEnabled = true;
+  bool _reflectionReminderEnabled = true;
+
+  // Priority colors
+  Color _priorityLowColor = AppColors.priorityLow;
+  Color _priorityMediumColor = AppColors.priorityMedium;
+  Color _priorityHighColor = AppColors.priorityHigh;
+  Color _priorityCriticalColor = AppColors.priorityCritical;
 
   @override
   Widget build(BuildContext context) {
@@ -40,21 +52,98 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           // Profile section
           _buildSectionHeader(context, 'Profile'),
+          Consumer(
+            builder: (context, ref, child) {
+              final currentUser = ref.watch(currentUserProvider);
+              return currentUser.when(
+                data: (user) {
+                  if (user == null) {
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.gray200,
+                        child: const Icon(Icons.person, color: AppColors.black),
+                      ),
+                      title: const Text('Not signed in'),
+                      subtitle: const Text('Tap to sign in'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => context.go(AppRoutes.auth),
+                    );
+                  }
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.gray200,
+                      backgroundImage: user.avatarUrl != null
+                          ? NetworkImage(user.avatarUrl!)
+                          : null,
+                      child: user.avatarUrl == null
+                          ? const Icon(Icons.person, color: AppColors.black)
+                          : null,
+                    ),
+                    title: Text(user.displayName ?? user.email),
+                    subtitle: Text(user.email),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: _editProfile,
+                  );
+                },
+                loading: () => const ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.gray200,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  title: Text('Loading...'),
+                ),
+                error: (_, __) => ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.gray200,
+                    child: const Icon(Icons.person, color: AppColors.black),
+                  ),
+                  title: const Text('Not signed in'),
+                  subtitle: const Text('Tap to sign in'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.go(AppRoutes.auth),
+                ),
+              );
+            },
+          ),
+
+          const Divider(),
+
+          // Appearance
+          _buildSectionHeader(context, 'Appearance'),
+          SwitchListTile(
+            secondary: const Icon(Icons.dark_mode),
+            title: const Text('Dark Mode'),
+            subtitle: const Text('Switch between light and dark theme'),
+            value: ref.watch(themeModeProvider) == ThemeMode.dark,
+            onChanged: (value) {
+              ref.read(themeModeProvider.notifier).state =
+                  value ? ThemeMode.dark : ThemeMode.light;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Dark mode ${value ? 'enabled' : 'disabled'}'),
+                ),
+              );
+            },
+          ),
           ListTile(
-            leading: CircleAvatar(
-              backgroundColor: AppColors.gray200,
-              child: const Icon(Icons.person, color: AppColors.black),
-            ),
-            title: const Text('John Doe'),
-            subtitle: const Text('john@example.com'),
+            leading: const Icon(Icons.palette),
+            title: const Text('Priority Colors'),
+            subtitle: const Text('Customize priority level colors'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: _editProfile,
+            onTap: _showPriorityColorsPicker,
           ),
 
           const Divider(),
 
           // Calendar settings
           _buildSectionHeader(context, 'Calendar'),
+          ListTile(
+            leading: const Icon(Icons.view_agenda),
+            title: const Text('Default Calendar View'),
+            subtitle: Text(_getCalendarViewLabel(_defaultCalendarView)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _selectDefaultCalendarView,
+          ),
           ListTile(
             leading: const Icon(Icons.public),
             title: const Text('Timezone'),
@@ -108,13 +197,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
               setState(() => _notificationsEnabled = value);
             },
           ),
+          SwitchListTile(
+            secondary: const Icon(Icons.alarm),
+            title: const Text('Event Reminders'),
+            subtitle: const Text('Get notified before events start'),
+            value: _eventRemindersEnabled,
+            onChanged: _notificationsEnabled
+                ? (value) {
+                    setState(() => _eventRemindersEnabled = value);
+                  }
+                : null,
+          ),
           ListTile(
-            enabled: _notificationsEnabled,
-            leading: const Icon(Icons.alarm),
+            enabled: _notificationsEnabled && _eventRemindersEnabled,
+            leading: const Icon(Icons.timer_outlined),
             title: const Text('Reminder lead time'),
             subtitle: Text('$_notificationLeadTime minutes before'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: _notificationsEnabled ? _selectLeadTime : null,
+            onTap: _notificationsEnabled && _eventRemindersEnabled
+                ? _selectLeadTime
+                : null,
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.self_improvement),
+            title: const Text('Reflection Reminder'),
+            subtitle: const Text('Daily reminder to complete reflection'),
+            value: _reflectionReminderEnabled,
+            onChanged: _notificationsEnabled
+                ? (value) {
+                    setState(() => _reflectionReminderEnabled = value);
+                  }
+                : null,
           ),
 
           const Divider(),
@@ -141,20 +254,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: Text('${(_streakThreshold * 100).toInt()}% to maintain streak'),
             trailing: const Icon(Icons.chevron_right),
             onTap: _selectStreakThreshold,
-          ),
-
-          const Divider(),
-
-          // Appearance
-          _buildSectionHeader(context, 'Appearance'),
-          SwitchListTile(
-            secondary: const Icon(Icons.dark_mode),
-            title: const Text('Dark mode'),
-            value: _darkMode,
-            onChanged: (value) {
-              setState(() => _darkMode = value);
-              // TODO: Apply theme change
-            },
           ),
 
           const Divider(),
@@ -213,7 +312,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Sign out
           ListTile(
             leading: const Icon(Icons.logout),
-            title: const Text('Sign out'),
+            title: const Text('Sign Out'),
             onTap: _signOut,
           ),
 
@@ -240,11 +339,265 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  String _getCalendarViewLabel(String view) {
+    switch (view) {
+      case 'day':
+        return 'Day';
+      case 'week':
+        return 'Week';
+      case 'month':
+        return 'Month';
+      default:
+        return 'Day';
+    }
+  }
+
   void _editProfile() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) => _EditProfileSheet(),
+    );
+  }
+
+  void _showPriorityColorsPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Priority Colors',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildColorOption(
+                    context,
+                    setModalState,
+                    'Low Priority',
+                    _priorityLowColor,
+                    (color) {
+                      setState(() => _priorityLowColor = color);
+                      setModalState(() {});
+                    },
+                  ),
+                  _buildColorOption(
+                    context,
+                    setModalState,
+                    'Medium Priority',
+                    _priorityMediumColor,
+                    (color) {
+                      setState(() => _priorityMediumColor = color);
+                      setModalState(() {});
+                    },
+                  ),
+                  _buildColorOption(
+                    context,
+                    setModalState,
+                    'High Priority',
+                    _priorityHighColor,
+                    (color) {
+                      setState(() => _priorityHighColor = color);
+                      setModalState(() {});
+                    },
+                  ),
+                  _buildColorOption(
+                    context,
+                    setModalState,
+                    'Critical Priority',
+                    _priorityCriticalColor,
+                    (color) {
+                      setState(() => _priorityCriticalColor = color);
+                      setModalState(() {});
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        setState(() {
+                          _priorityLowColor = AppColors.priorityLow;
+                          _priorityMediumColor = AppColors.priorityMedium;
+                          _priorityHighColor = AppColors.priorityHigh;
+                          _priorityCriticalColor = AppColors.priorityCritical;
+                        });
+                        setModalState(() {});
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Colors reset to defaults')),
+                        );
+                      },
+                      child: const Text('Reset to Defaults'),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Priority colors saved')),
+                        );
+                      },
+                      child: const Text('Save'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildColorOption(
+    BuildContext context,
+    StateSetter setModalState,
+    String label,
+    Color currentColor,
+    Function(Color) onColorSelected,
+  ) {
+    final colorOptions = [
+      AppColors.priorityLow,
+      AppColors.priorityMedium,
+      AppColors.priorityHigh,
+      AppColors.priorityCritical,
+      const Color(0xFF9C27B0), // Purple
+      const Color(0xFF00BCD4), // Cyan
+      const Color(0xFF795548), // Brown
+      const Color(0xFF607D8B), // Blue Gray
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (dialogContext) => AlertDialog(
+                  title: Text('Select $label Color'),
+                  content: Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: colorOptions.map((color) {
+                      final isSelected = color.value == currentColor.value;
+                      return GestureDetector(
+                        onTap: () {
+                          onColorSelected(color);
+                          Navigator.pop(dialogContext);
+                        },
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: isSelected
+                                ? Border.all(color: AppColors.black, width: 3)
+                                : null,
+                          ),
+                          child: isSelected
+                              ? const Icon(Icons.check, color: AppColors.white)
+                              : null,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              );
+            },
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: currentColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.gray300),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _selectDefaultCalendarView() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Text(
+                'Default Calendar View',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.view_day),
+              title: const Text('Day'),
+              trailing: _defaultCalendarView == 'day'
+                  ? const Icon(Icons.check)
+                  : null,
+              onTap: () {
+                setState(() => _defaultCalendarView = 'day');
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.view_week),
+              title: const Text('Week'),
+              trailing: _defaultCalendarView == 'week'
+                  ? const Icon(Icons.check)
+                  : null,
+              onTap: () {
+                setState(() => _defaultCalendarView = 'week');
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.calendar_view_month),
+              title: const Text('Month'),
+              trailing: _defaultCalendarView == 'month'
+                  ? const Icon(Icons.check)
+                  : null,
+              onTap: () {
+                setState(() => _defaultCalendarView = 'month');
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -579,27 +932,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showLicenses() {
     showLicensePage(
       context: context,
-      applicationName: 'Ctrl+Shift+Date',
+      applicationName: 'ctrl^date',
       applicationVersion: '1.0.0',
     );
   }
 
   void _signOut() {
+    // Capture references before showing dialog
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    final authActions = ref.read(authActionsProvider);
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Sign Out'),
         content: const Text('Are you sure you want to sign out?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Implement sign out
-              context.go('/');
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+
+              // Show loading indicator
+              scaffoldMessenger.showSnackBar(
+                const SnackBar(content: Text('Signing out...')),
+              );
+
+              // Actually sign out using auth actions
+              final result = await authActions.signOut();
+
+              if (result.isSuccess) {
+                // Navigate to auth screen
+                router.go(AppRoutes.auth);
+              } else {
+                // Show error
+                scaffoldMessenger.showSnackBar(
+                  SnackBar(
+                    content: Text(result.error ?? 'Sign out failed'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
             },
             child: const Text('Sign Out'),
           ),

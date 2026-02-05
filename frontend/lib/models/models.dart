@@ -6,3 +6,4 @@ export 'event.dart';
 export 'friendship.dart';
 export 'inbox.dart';
 export 'reflection.dart';
+export 'suggestion.dart';

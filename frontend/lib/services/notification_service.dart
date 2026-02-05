@@ -297,15 +297,25 @@ class NotificationService {
     final minute = int.parse(parts[1]);
 
     // Calculate next occurrence
-    var scheduledTime = tz.TZDateTime.now(tz.local).copyWith(
-      hour: hour,
-      minute: minute,
-      second: 0,
-      millisecond: 0,
+    final now = tz.TZDateTime.now(tz.local);
+    tz.TZDateTime scheduledTime = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
     );
 
-    if (scheduledTime.isBefore(tz.TZDateTime.now(tz.local))) {
-      scheduledTime = scheduledTime.add(const Duration(days: 1));
+    if (scheduledTime.isBefore(now)) {
+      scheduledTime = tz.TZDateTime(
+        tz.local,
+        now.year,
+        now.month,
+        now.day + 1,
+        hour,
+        minute,
+      );
     }
 
     await _plugin!.zonedSchedule(

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/user.dart' as app;
@@ -106,7 +105,7 @@ class AuthService {
 
   /// Sign in with OAuth provider
   Future<AuthResult> signInWithOAuth({
-    required OAuthProvider provider,
+    required AppOAuthProvider provider,
     String? redirectTo,
     String? scopes,
   }) async {
@@ -132,6 +131,15 @@ class AuthService {
     } catch (e) {
       return AuthResult.failure('An unexpected error occurred: ${e.toString()}');
     }
+  }
+
+  /// Sign in with Google - convenience method for Google OAuth
+  Future<AuthResult> signInWithGoogle({String? redirectTo}) async {
+    return signInWithOAuth(
+      provider: AppOAuthProvider.google,
+      redirectTo: redirectTo,
+      scopes: 'email profile',
+    );
   }
 
   /// Sign out
@@ -339,14 +347,25 @@ class AuthService {
     }
   }
 
-  /// Map OAuth provider enum
-  OAuthProvider _mapOAuthProvider(OAuthProvider provider) {
-    return provider;
+  /// Map app OAuth provider to Supabase OAuthProvider
+  OAuthProvider _mapOAuthProvider(AppOAuthProvider provider) {
+    switch (provider) {
+      case AppOAuthProvider.google:
+        return OAuthProvider.google;
+      case AppOAuthProvider.apple:
+        return OAuthProvider.apple;
+      case AppOAuthProvider.github:
+        return OAuthProvider.github;
+      case AppOAuthProvider.facebook:
+        return OAuthProvider.facebook;
+      case AppOAuthProvider.twitter:
+        return OAuthProvider.twitter;
+    }
   }
 }
 
-/// OAuth providers
-enum OAuthProvider {
+/// OAuth providers available in the app
+enum AppOAuthProvider {
   google,
   apple,
   github,

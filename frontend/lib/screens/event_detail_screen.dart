@@ -96,17 +96,21 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
         ),
         title: _isEditing ? const Text('Edit Event') : null,
         actions: [
           if (!_isEditing) ...[
             IconButton(
               icon: const Icon(Icons.edit_outlined),
-              onPressed: _event['is_locked']
-                  ? null
-                  : () => setState(() => _isEditing = true),
-              tooltip: _event['is_locked'] ? 'Locked events cannot be edited' : 'Edit',
+              onPressed: () => setState(() => _isEditing = true),
+              tooltip: 'Edit',
             ),
             PopupMenuButton<String>(
               onSelected: _handleMenuAction,
@@ -130,16 +134,15 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 const PopupMenuDivider(),
                 PopupMenuItem(
                   value: 'delete',
-                  enabled: !_event['is_locked'],
                   child: ListTile(
                     leading: Icon(
                       Icons.delete_outline,
-                      color: _event['is_locked'] ? null : AppColors.error,
+                      color: AppColors.error,
                     ),
                     title: Text(
                       'Delete',
                       style: TextStyle(
-                        color: _event['is_locked'] ? null : AppColors.error,
+                        color: AppColors.error,
                       ),
                     ),
                     contentPadding: EdgeInsets.zero,
@@ -183,6 +186,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 child: Text(
                   _event['title'],
                   style: theme.textTheme.displaySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),

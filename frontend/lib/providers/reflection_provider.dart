@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../database/database.dart';
+import '../database/database.dart' hide DailyReflection, Streak;
 import '../main.dart';
 import '../models/reflection.dart';
 import '../services/api_service.dart';

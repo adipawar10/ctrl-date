@@ -1,4 +1,4 @@
-/// Ctrl+Shift+Date - Main Application Entry Point
+/// ctrl^date - Main Application Entry Point
 /// Cross-platform productivity app with intelligent scheduling
 library;
 
@@ -10,6 +10,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'utils/constants.dart';
 import 'services/notification_service.dart';
 import 'database/database.dart';
+import 'providers/onboarding_provider.dart';
+import 'widgets/whats_new_dialog.dart';
 import 'theme.dart';
 import 'router.dart';
 
@@ -50,12 +52,34 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 
 /// Main application widget
-class CtrlShiftDateApp extends ConsumerWidget {
+class CtrlShiftDateApp extends ConsumerStatefulWidget {
   const CtrlShiftDateApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CtrlShiftDateApp> createState() => _CtrlShiftDateAppState();
+}
+
+class _CtrlShiftDateAppState extends ConsumerState<CtrlShiftDateApp> {
+  bool _checkedForUpdates = false;
+
+  @override
+  Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
+    final onboardingState = ref.watch(onboardingProvider);
+
+    // Show What's New dialog for returning users with updates
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_checkedForUpdates &&
+          !onboardingState.isLoading &&
+          onboardingState.isComplete &&
+          onboardingState.hasNewUpdate) {
+        _checkedForUpdates = true;
+        final ctx = appRouter.routerDelegate.navigatorKey.currentContext;
+        if (ctx != null) {
+          WhatsNewDialog.show(ctx);
+        }
+      }
+    });
 
     return MaterialApp.router(
       title: AppConstants.appName,
@@ -72,96 +96,3 @@ class CtrlShiftDateApp extends ConsumerWidget {
   }
 }
 
-/// Splash screen shown during app initialization
-class SplashScreen extends StatelessWidget {
-  const SplashScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.calendar_today_rounded,
-              size: 80,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Ctrl+Shift+Date',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const CircularProgressIndicator(),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Placeholder for Auth screen - implement with actual auth UI
-class AuthScreen extends StatelessWidget {
-  const AuthScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.calendar_today_rounded,
-                size: 64,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Ctrl+Shift+Date',
-                style: theme.textTheme.headlineLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Intelligent productivity scheduling',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 48),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: Implement authentication
-                  },
-                  child: const Text('Sign In'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () {
-                    // TODO: Implement registration
-                  },
-                  child: const Text('Create Account'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

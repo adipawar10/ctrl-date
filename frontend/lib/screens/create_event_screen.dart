@@ -1,16 +1,21 @@
-/// Ctrl+Shift+Date - Create Event Screen
+/// ctrl^date - Create Event Screen
 /// Form for creating new events
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 
+import '../models/event.dart';
+import '../providers/events_provider.dart';
+import '../router.dart';
 import '../theme.dart';
 import '../widgets/conflict_warning.dart';
 
 /// Create event screen with form
-class CreateEventScreen extends StatefulWidget {
+class CreateEventScreen extends ConsumerStatefulWidget {
   final DateTime? initialDate;
 
   const CreateEventScreen({
@@ -19,10 +24,10 @@ class CreateEventScreen extends StatefulWidget {
   });
 
   @override
-  State<CreateEventScreen> createState() => _CreateEventScreenState();
+  ConsumerState<CreateEventScreen> createState() => _CreateEventScreenState();
 }
 
-class _CreateEventScreenState extends State<CreateEventScreen> {
+class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
   final _formKey = GlobalKey<FormState>();
 
   // Form controllers
@@ -73,7 +78,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
         ),
         title: const Text('New Event'),
         actions: [
@@ -213,33 +224,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             // Priority
             Text('Priority', style: theme.textTheme.labelLarge),
             const SizedBox(height: AppSpacing.sm),
-            SegmentedButton<int>(
-              segments: [
-                ButtonSegment(
-                  value: 1,
-                  label: const Text('Low'),
-                  icon: Icon(Icons.circle, size: 12, color: AppColors.priorityLow),
-                ),
-                ButtonSegment(
-                  value: 2,
-                  label: const Text('Medium'),
-                  icon: Icon(Icons.circle, size: 12, color: AppColors.priorityMedium),
-                ),
-                ButtonSegment(
-                  value: 3,
-                  label: const Text('High'),
-                  icon: Icon(Icons.circle, size: 12, color: AppColors.priorityHigh),
-                ),
-                ButtonSegment(
-                  value: 4,
-                  label: const Text('Critical'),
-                  icon: Icon(Icons.circle, size: 12, color: AppColors.priorityCritical),
-                ),
+            Row(
+              children: [
+                _buildPriorityChip(1, 'Low', AppColors.priorityLow),
+                const SizedBox(width: AppSpacing.sm),
+                _buildPriorityChip(2, 'Med', AppColors.priorityMedium),
+                const SizedBox(width: AppSpacing.sm),
+                _buildPriorityChip(3, 'High', AppColors.priorityHigh),
+                const SizedBox(width: AppSpacing.sm),
+                _buildPriorityChip(4, 'Critical', AppColors.priorityCritical),
               ],
-              selected: {_priority},
-              onSelectionChanged: (selection) {
-                setState(() => _priority = selection.first);
-              },
             ),
 
             const SizedBox(height: AppSpacing.lg),
@@ -444,7 +438,56 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     });
   }
 
-  void _saveEvent() {
+  Widget _buildPriorityChip(int value, String label, Color color) {
+    final isSelected = _priority == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _priority = value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            vertical: AppSpacing.sm,
+            horizontal: AppSpacing.xs,
+          ),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.2) : AppColors.gray100,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(
+              color: isSelected ? color : AppColors.gray300,
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    color: isSelected ? color : AppColors.gray700,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveEvent() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -466,26 +509,57 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       _allDay ? 59 : _endTime.minute,
     );
 
-    final eventData = {
-      'title': _titleController.text.trim(),
-      'description': _descriptionController.text.trim(),
-      'location': _locationController.text.trim(),
-      'start_time': startDateTime.toIso8601String(),
-      'end_time': endDateTime.toIso8601String(),
-      'all_day': _allDay,
-      'is_locked': _isLocked,
-      'priority': _priority,
-      'recurrence': _recurrence,
-      'tags': _tags,
+    // Map priority int to EventPriority enum
+    final priority = switch (_priority) {
+      1 => EventPriority.low,
+      2 => EventPriority.medium,
+      3 => EventPriority.high,
+      4 => EventPriority.urgent,
+      _ => EventPriority.medium,
     };
 
-    // TODO: Send to API
-    debugPrint('Creating event: $eventData');
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Event created')),
+    // Create the Event object
+    final event = Event(
+      id: const Uuid().v4(),
+      userId: '', // Will be set by the backend
+      title: _titleController.text.trim(),
+      description: _descriptionController.text.trim().isNotEmpty
+          ? _descriptionController.text.trim()
+          : null,
+      startTime: startDateTime,
+      endTime: endDateTime,
+      isAllDay: _allDay,
+      location: _locationController.text.trim().isNotEmpty
+          ? _locationController.text.trim()
+          : null,
+      priority: priority,
+      tags: _tags,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
 
-    context.pop();
+    try {
+      // Save using events provider
+      final eventActions = ref.read(eventActionsProvider);
+      await eventActions.create(event);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Event created')),
+        );
+
+        // Navigate back to calendar
+        context.go(AppRoutes.calendar);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to create event: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 }

@@ -174,19 +174,19 @@ class UserProfiles extends Table {
 
 /// Sync metadata table for tracking sync state
 class SyncMetadata extends Table {
-  TextColumn get tableName => text().named('table_name')();
+  TextColumn get syncTable => text().named('table_name')();
   DateTimeColumn get lastSyncAt => dateTime().nullable().named('last_sync_at')();
   IntColumn get lastSyncVersion => integer().nullable().named('last_sync_version')();
   TextColumn get syncCursor => text().nullable().named('sync_cursor')();
 
   @override
-  Set<Column> get primaryKey => {tableName};
+  Set<Column> get primaryKey => {syncTable};
 }
 
 /// Pending sync operations table
 class PendingSyncOperations extends Table {
   IntColumn get id => integer().autoIncrement()();
-  TextColumn get tableName => text().named('table_name')();
+  TextColumn get syncTable => text().named('table_name')();
   TextColumn get recordId => text().named('record_id')();
   TextColumn get operation => text()(); // 'insert', 'update', 'delete'
   TextColumn get data => text().nullable()(); // JSON

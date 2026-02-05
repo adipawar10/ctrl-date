@@ -9,8 +9,8 @@ import 'package:intl/intl.dart';
 import '../router.dart';
 import '../theme.dart';
 import '../widgets/progress_indicator.dart' as app;
-import '../widgets/streak_badge.dart';
 import '../widgets/event_card.dart';
+import '../services/streak_service.dart';
 
 /// Reflection screen for daily review
 class ReflectionScreen extends StatefulWidget {
@@ -35,6 +35,7 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
   // Mock data - replace with actual state management
   late Map<String, dynamic> _reflection;
   late List<Map<String, dynamic>> _events;
+  int _productivityStreak = 0;
 
   @override
   void initState() {
@@ -114,6 +115,9 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
       },
     ];
 
+    // Mock productivity streak
+    _productivityStreak = 7;
+
     _notesController.text = _reflection['notes'] ?? '';
     _selectedMood = _reflection['mood'];
 
@@ -124,11 +128,24 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
   }
 
   double get _completionRate {
-    final planned = _reflection['events_planned'] as int;
-    if (planned == 0) return 0;
-    final completed = _reflection['events_completed'] as int;
-    final partial = _reflection['events_partial'] as int;
-    return (completed + partial * 0.5) / planned;
+    return StreakService.calculateDailyCompletionRate(_selectedDate, _events);
+  }
+
+  String get _supportiveMessage {
+    return StreakService.getSupportiveMessage(_completionRate);
+  }
+
+  void _updateEventStatus(String eventId, String newStatus) {
+    setState(() {
+      final index = _events.indexWhere((e) => e['id'] == eventId);
+      if (index != -1) {
+        _events[index] = {
+          ..._events[index],
+          'status': newStatus,
+        };
+        _hasChanges = true;
+      }
+    });
   }
 
   @override
@@ -166,6 +183,11 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
               onRefresh: _loadReflection,
               child: CustomScrollView(
                 slivers: [
+                  // Streak card at the top
+                  SliverToBoxAdapter(
+                    child: _buildStreakCard(context),
+                  ),
+
                   // Stats section
                   SliverToBoxAdapter(
                     child: _buildStatsSection(context),
@@ -206,7 +228,7 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
                     ),
                   ),
 
-                  // Events list
+                  // Events list with completion status buttons
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                     sliver: SliverList(
@@ -215,16 +237,7 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
                           final event = _events[index];
                           return Padding(
                             padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                            child: EventCard(
-                              id: event['id'],
-                              title: event['title'],
-                              startTime: event['start_time'],
-                              endTime: event['end_time'],
-                              isLocked: event['is_locked'],
-                              priority: event['priority'],
-                              status: event['status'],
-                              onTap: () => context.goToEvent(event['id']),
-                            ),
+                            child: _buildEventWithStatusButtons(context, event),
                           );
                         },
                         childCount: _events.length,
@@ -240,77 +253,204 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
     );
   }
 
-  Widget _buildStatsSection(BuildContext context) {
+  Widget _buildStreakCard(BuildContext context) {
     final theme = Theme.of(context);
+    final completionPercentage = (_completionRate * 100).toInt();
 
     return Container(
       margin: const EdgeInsets.all(AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: AppColors.gray100,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.gray200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Streak row
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Completion Rate',
-                style: theme.textTheme.titleMedium,
+              // Flame icon with streak count
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: _productivityStreak > 0
+                      ? AppColors.warning.withValues(alpha: 0.1)
+                      : AppColors.gray200,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _productivityStreak >= 30
+                          ? Icons.whatshot
+                          : Icons.local_fire_department,
+                      size: 24,
+                      color: _productivityStreak > 0
+                          ? AppColors.warning
+                          : AppColors.gray400,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      '$_productivityStreak',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: _productivityStreak > 0
+                            ? AppColors.black
+                            : AppColors.gray500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              Row(
+              const SizedBox(width: AppSpacing.md),
+              // Streak info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _productivityStreak == 1
+                          ? 'Day Streak'
+                          : 'Day Streak',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      StreakService.getStreakMessage(_productivityStreak),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.gray600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Completion percentage
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  StreakBadge(
-                    count: 7,
-                    compact: true,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
                   Text(
-                    '${(_completionRate * 100).toInt()}%',
-                    style: theme.textTheme.titleMedium?.copyWith(
+                    '$completionPercentage%',
+                    style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w700,
+                      color: _getCompletionColor(),
+                    ),
+                  ),
+                  Text(
+                    'Today',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppColors.gray500,
                     ),
                   ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.md),
+          // Progress bar
           app.ProgressIndicator(
             value: _completionRate,
             height: 8,
           ),
           const SizedBox(height: AppSpacing.md),
+          // Supportive message
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _getMessageIcon(),
+                  size: 20,
+                  color: _getCompletionColor(),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    _supportiveMessage,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.gray700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
+  IconData _getMessageIcon() {
+    if (_completionRate >= 1.0) return Icons.celebration;
+    if (_completionRate >= 0.7) return Icons.thumb_up;
+    if (_completionRate >= 0.5) return Icons.trending_up;
+    return Icons.favorite;
+  }
+
+  Color _getCompletionColor() {
+    if (_completionRate >= 1.0) return AppColors.completed;
+    if (_completionRate >= 0.7) return AppColors.completed;
+    if (_completionRate >= 0.5) return AppColors.partial;
+    return AppColors.gray600;
+  }
+
+  Widget _buildStatsSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final completed = _events.where((e) => e['status'] == 'completed').length;
+    final partial = _events.where((e) => e['status'] == 'partial').length;
+    final skipped = _events.where((e) => e['status'] == 'skipped').length;
+    final pending = _events.where((e) =>
+        e['status'] != 'completed' &&
+        e['status'] != 'partial' &&
+        e['status'] != 'skipped').length;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.gray200),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Breakdown',
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: AppSpacing.md),
           // Stats breakdown
           Row(
             children: [
               _buildStatItem(
                 context,
-                count: _reflection['events_completed'],
+                count: completed,
                 label: 'Completed',
                 color: AppColors.completed,
               ),
               _buildStatItem(
                 context,
-                count: _reflection['events_partial'],
+                count: partial,
                 label: 'Partial',
                 color: AppColors.partial,
               ),
               _buildStatItem(
                 context,
-                count: _reflection['events_skipped'],
+                count: skipped,
                 label: 'Skipped',
                 color: AppColors.skipped,
               ),
               _buildStatItem(
                 context,
-                count: _reflection['events_planned'] -
-                    _reflection['events_completed'] -
-                    _reflection['events_partial'] -
-                    _reflection['events_skipped'],
+                count: pending,
                 label: 'Pending',
                 color: AppColors.gray500,
               ),
@@ -365,7 +505,7 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
     final theme = Theme.of(context);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      margin: const EdgeInsets.all(AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.gray200),
@@ -472,7 +612,7 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -495,6 +635,140 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEventWithStatusButtons(
+    BuildContext context,
+    Map<String, dynamic> event,
+  ) {
+    final theme = Theme.of(context);
+    final currentStatus = event['status'] as String;
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.gray200),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Column(
+        children: [
+          // Event card
+          EventCard(
+            id: event['id'],
+            title: event['title'],
+            startTime: event['start_time'],
+            endTime: event['end_time'],
+            isLocked: event['is_locked'],
+            priority: event['priority'],
+            status: currentStatus,
+            onTap: () => context.goToEvent(event['id']),
+          ),
+          // Status buttons
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: const BoxDecoration(
+              color: AppColors.gray100,
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(AppRadius.md),
+                bottomRight: Radius.circular(AppRadius.md),
+              ),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  'Mark as:',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppColors.gray600,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                _buildStatusButton(
+                  context,
+                  eventId: event['id'],
+                  status: 'completed',
+                  label: 'Done',
+                  icon: Icons.check_circle_outline,
+                  color: AppColors.completed,
+                  isSelected: currentStatus == 'completed',
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                _buildStatusButton(
+                  context,
+                  eventId: event['id'],
+                  status: 'partial',
+                  label: 'Partial',
+                  icon: Icons.timelapse,
+                  color: AppColors.partial,
+                  isSelected: currentStatus == 'partial',
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                _buildStatusButton(
+                  context,
+                  eventId: event['id'],
+                  status: 'skipped',
+                  label: 'Skip',
+                  icon: Icons.skip_next_outlined,
+                  color: AppColors.skipped,
+                  isSelected: currentStatus == 'skipped',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusButton(
+    BuildContext context, {
+    required String eventId,
+    required String status,
+    required String label,
+    required IconData icon,
+    required Color color,
+    required bool isSelected,
+  }) {
+    final theme = Theme.of(context);
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _updateEventStatus(eventId, status),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xs,
+            vertical: AppSpacing.xs,
+          ),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.15) : AppColors.white,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(
+              color: isSelected ? color : AppColors.gray300,
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? color : AppColors.gray500,
+              ),
+              const SizedBox(width: 2),
+              Flexible(
+                child: Text(
+                  label,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: isSelected ? color : AppColors.gray600,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -523,6 +797,10 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
       'date': _selectedDate.toIso8601String(),
       'notes': _notesController.text,
       'mood': _selectedMood,
+      'events': _events.map((e) => {
+        'id': e['id'],
+        'status': e['status'],
+      }).toList(),
     };
 
     debugPrint('Saving reflection: $reflectionData');

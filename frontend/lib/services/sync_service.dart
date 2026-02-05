@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../database/database.dart';
+import '../database/database.dart' hide Event, DailyReflection;
 import '../models/event.dart';
 import '../models/reflection.dart';
 import 'api_service.dart';

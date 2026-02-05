@@ -8,7 +8,6 @@ import 'package:intl/intl.dart';
 
 import '../router.dart';
 import '../theme.dart';
-import '../widgets/calendar_day_cell.dart';
 
 /// Week view screen showing 7-day grid
 class WeekViewScreen extends StatefulWidget {
@@ -32,6 +31,19 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
 
   // Mock events - replace with actual state management
   final Map<String, List<Map<String, dynamic>>> _eventsByDay = {};
+
+  /// Formats hour to 12-hour AM/PM format
+  String _formatHour(int hour) {
+    if (hour == 0 || hour == 24) {
+      return '12 AM';
+    } else if (hour == 12) {
+      return '12 PM';
+    } else if (hour < 12) {
+      return '$hour AM';
+    } else {
+      return '${hour - 12} PM';
+    }
+  }
 
   @override
   void initState() {
@@ -324,9 +336,7 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
                           child: Align(
                             alignment: Alignment.topRight,
                             child: Text(
-                              DateFormat('HH:00').format(
-                                DateTime(2000, 1, 1, hour),
-                              ),
+                              _formatHour(hour),
                               style: theme.textTheme.labelSmall,
                             ),
                           ),
@@ -394,9 +404,9 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
 
   Widget _buildEventBlock(BuildContext context, Map<String, dynamic> event) {
     final startMinutes =
-        (event['start_hour'] as int - _startHour) * 60 + (event['start_minute'] as int);
+        ((event['start_hour'] as int) - _startHour) * 60 + (event['start_minute'] as int);
     final endMinutes =
-        (event['end_hour'] as int - _startHour) * 60 + (event['end_minute'] as int);
+        ((event['end_hour'] as int) - _startHour) * 60 + (event['end_minute'] as int);
     final duration = endMinutes - startMinutes;
 
     final top = startMinutes * (_hourHeight / 60);
@@ -414,6 +424,7 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
         onTap: () => context.goToEvent(event['id']),
         child: Container(
           padding: const EdgeInsets.all(4),
+          clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
             color: AppColors.white,
             border: Border.all(color: AppColors.gray300),
@@ -421,6 +432,7 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Row(
                 children: [
@@ -440,20 +452,20 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
                       color: AppColors.gray600,
                     ),
                   ],
-                ],
-              ),
-              const SizedBox(height: 2),
-              Expanded(
-                child: Text(
-                  event['title'],
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.black,
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      event['title'],
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.black,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  maxLines: height > 40 ? 2 : 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                ],
               ),
             ],
           ),

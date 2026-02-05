@@ -55,12 +55,16 @@ class FriendTile extends StatelessWidget {
       title: Text(
         displayName,
         style: theme.textTheme.titleSmall,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
         _getSubtitle(),
         style: theme.textTheme.bodySmall?.copyWith(
           color: isOnline ? AppColors.completed : AppColors.gray500,
         ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
       trailing: onPoke != null
           ? IconButton(
@@ -280,10 +284,14 @@ class FriendRequestTile extends StatelessWidget {
       title: Text(
         displayName,
         style: theme.textTheme.titleSmall,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
         _getSubtitle(),
         style: theme.textTheme.bodySmall,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
       trailing: isIncoming
           ? Row(

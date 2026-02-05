@@ -1,22 +1,22 @@
-import 'dart:ui';
+import 'package:flutter/material.dart';
 
 /// Application constants
 class AppConstants {
   AppConstants._();
 
   /// Application name
-  static const String appName = 'Ctrl+Shift+Date';
+  static const String appName = 'ctrl^date';
 
   /// Application version
   static const String appVersion = '1.0.0';
 
   /// Supabase configuration
   /// These should be replaced with environment variables in production
-  static const String supabaseUrl = 'https://your-project.supabase.co';
-  static const String supabaseAnonKey = 'your-anon-key';
+  static const String supabaseUrl = 'https://qsinqjlxfvkguagpaqdf.supabase.co';
+  static const String supabaseAnonKey = 'sb_publishable_qTzpzY8e785uuv4y1tEvTA_5TROfz7q';
 
   /// API configuration
-  static const String apiBaseUrl = 'https://api.ctrlshiftdate.app/v1';
+  static const String apiBaseUrl = 'https://api.ctrldate.app/v1';
   static const Duration apiTimeout = Duration(seconds: 30);
 
   /// Cache configuration

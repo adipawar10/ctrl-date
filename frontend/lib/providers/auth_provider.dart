@@ -14,7 +14,7 @@ final authServiceProvider = Provider<AuthService>((ref) {
 
 /// Provider for the current Supabase auth state
 final authStateProvider = StreamProvider<supabase.User?>((ref) {
-  return Supabase.instance.client.auth.onAuthStateChange.map(
+  return supabase.Supabase.instance.client.auth.onAuthStateChange.map(
     (event) => event.session?.user,
   );
 });
@@ -143,7 +143,7 @@ class UserPreferencesNotifier extends StateNotifier<UserPreferences> {
   Future<void> _savePreferences() async {
     // Save preferences to Supabase
     try {
-      await Supabase.instance.client.auth.updateUser(
+      await supabase.Supabase.instance.client.auth.updateUser(
         supabase.UserAttributes(
           data: {'preferences': state.toJson()},
         ),
@@ -220,7 +220,7 @@ class AuthActions {
   }
 
   /// Sign in with OAuth provider
-  Future<AuthResult> signInWithOAuth(OAuthProvider provider) async {
+  Future<AuthResult> signInWithOAuth(AppOAuthProvider provider) async {
     return _authService.signInWithOAuth(provider: provider);
   }
 
@@ -278,7 +278,7 @@ class AuthActions {
 
 /// Provider for the current session
 final currentSessionProvider = Provider<supabase.Session?>((ref) {
-  return Supabase.instance.client.auth.currentSession;
+  return supabase.Supabase.instance.client.auth.currentSession;
 });
 
 /// Provider for checking if session is expired

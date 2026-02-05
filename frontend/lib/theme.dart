@@ -1,4 +1,4 @@
-/// Ctrl+Shift+Date - Black and White Theme
+/// ctrl^date - Black and White Theme
 /// Minimalist, high-contrast, professional design
 library;
 
@@ -315,7 +315,7 @@ class AppTheme {
         ),
 
         // Cards
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: AppColors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
@@ -485,7 +485,7 @@ class AppTheme {
         ),
 
         // Dialog
-        dialogTheme: DialogTheme(
+        dialogTheme: DialogThemeData(
           backgroundColor: AppColors.white,
           elevation: 8,
           shape: RoundedRectangleBorder(
@@ -550,7 +550,7 @@ class AppTheme {
         ),
 
         // Tab bar
-        tabBarTheme: const TabBarTheme(
+        tabBarTheme: const TabBarThemeData(
           labelColor: AppColors.black,
           unselectedLabelColor: AppColors.gray500,
           labelStyle: AppTypography.labelLarge,
@@ -649,6 +649,251 @@ class AppTheme {
           iconTheme: IconThemeData(color: AppColors.white, size: 24),
         ),
 
-        // Additional dark theme overrides would follow same pattern
+        // Navigation bar (Material 3)
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: AppColors.darkGray,
+          indicatorColor: AppColors.gray800,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          height: 64,
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return AppTypography.labelSmall.copyWith(
+                color: AppColors.white,
+                fontWeight: FontWeight.w600,
+              );
+            }
+            return AppTypography.labelSmall.copyWith(color: AppColors.gray500);
+          }),
+          iconTheme: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const IconThemeData(color: AppColors.white, size: 24);
+            }
+            return const IconThemeData(color: AppColors.gray500, size: 24);
+          }),
+        ),
+
+        // Cards
+        cardTheme: CardThemeData(
+          color: AppColors.gray900,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            side: const BorderSide(color: AppColors.gray800),
+          ),
+          margin: EdgeInsets.zero,
+        ),
+
+        // Buttons
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.white,
+            foregroundColor: AppColors.black,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+          ),
+        ),
+
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.white,
+            side: const BorderSide(color: AppColors.gray600),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+          ),
+        ),
+
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.white,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+          ),
+        ),
+
+        // Input decoration
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: AppColors.gray900,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.md,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            borderSide: const BorderSide(color: AppColors.white, width: 2),
+          ),
+          hintStyle: AppTypography.bodyMedium.copyWith(color: AppColors.gray500),
+          labelStyle: AppTypography.bodyMedium.copyWith(color: AppColors.gray400),
+        ),
+
+        // List tile
+        listTileTheme: ListTileThemeData(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          titleTextStyle: AppTypography.bodyLarge.copyWith(color: AppColors.white),
+          subtitleTextStyle: AppTypography.bodySmall.copyWith(color: AppColors.gray400),
+          iconColor: AppColors.gray400,
+        ),
+
+        // Switch
+        switchTheme: SwitchThemeData(
+          thumbColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return AppColors.black;
+            }
+            return AppColors.gray500;
+          }),
+          trackColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return AppColors.white;
+            }
+            return AppColors.gray700;
+          }),
+          trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+        ),
+
+        // Divider
+        dividerTheme: const DividerThemeData(
+          color: AppColors.gray800,
+          thickness: 1,
+          space: 1,
+        ),
+
+        // Snackbar
+        snackBarTheme: SnackBarThemeData(
+          backgroundColor: AppColors.gray200,
+          contentTextStyle:
+              AppTypography.bodyMedium.copyWith(color: AppColors.black),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+
+        // Text theme with white colors - use inherit: true for smooth transitions
+        textTheme: const TextTheme(
+          displayLarge: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 32,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
+            color: AppColors.white,
+          ),
+          displayMedium: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 28,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.25,
+            color: AppColors.white,
+          ),
+          displaySmall: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            color: AppColors.white,
+          ),
+          headlineLarge: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            color: AppColors.white,
+          ),
+          headlineMedium: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+            color: AppColors.white,
+          ),
+          headlineSmall: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+            color: AppColors.white,
+          ),
+          titleLarge: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppColors.white,
+          ),
+          titleMedium: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.white,
+          ),
+          titleSmall: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.gray400,
+          ),
+          bodyLarge: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 16,
+            fontWeight: FontWeight.w400,
+            color: AppColors.gray300,
+          ),
+          bodyMedium: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            color: AppColors.gray300,
+          ),
+          bodySmall: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+            color: AppColors.gray400,
+          ),
+          labelLarge: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.1,
+            color: AppColors.white,
+          ),
+          labelMedium: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.5,
+            color: AppColors.gray400,
+          ),
+          labelSmall: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.5,
+            color: AppColors.gray400,
+          ),
+        ),
       );
 }

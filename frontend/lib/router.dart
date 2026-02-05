@@ -1,58 +1,66 @@
-/// Ctrl+Shift+Date - GoRouter Configuration
+/// ctrl^date - GoRouter Configuration
 /// All app routes and navigation logic
 library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'screens/home_screen.dart';
-import 'screens/day_view_screen.dart';
-import 'screens/week_view_screen.dart';
-import 'screens/month_view_screen.dart';
+import 'screens/calendar_screen.dart';
 import 'screens/event_detail_screen.dart';
 import 'screens/create_event_screen.dart';
 import 'screens/reflection_screen.dart';
-import 'screens/friends_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/ai_suggestions_screen.dart';
+import 'screens/auth_screen.dart';
+import 'screens/sign_in_screen.dart';
+import 'screens/sign_up_screen.dart';
+import 'screens/onboarding_screen.dart';
+import 'providers/onboarding_provider.dart';
+import 'widgets/main_shell.dart';
 
 /// Route names for type-safe navigation
 class AppRoutes {
   AppRoutes._();
 
-  static const String home = '/';
-  static const String day = '/day';
-  static const String week = '/week';
-  static const String month = '/month';
+  // Auth routes
+  static const String auth = '/auth';
+  static const String signIn = '/sign-in';
+  static const String signUp = '/sign-up';
+  static const String onboarding = '/onboarding';
+
+  // Main app routes (5 tabs)
+  static const String calendar = '/calendar';
+  static const String inbox = '/inbox';
+  static const String suggestions = '/suggestions';
+  static const String reflection = '/reflection';
+  static const String settings = '/settings';
+
+  // Legacy routes (redirect to new tabs)
+  static const String home = '/calendar';
+  static const String day = '/calendar';
+  static const String week = '/calendar';
+  static const String month = '/calendar';
+  static const String aiSuggestions = '/suggestions';
+  static const String friends = '/inbox';
+
+  // Detail routes
   static const String eventDetail = '/event/:id';
   static const String createEvent = '/event/create';
-  static const String reflection = '/reflection';
-  static const String friends = '/friends';
-  static const String inbox = '/inbox';
-  static const String settings = '/settings';
-  static const String aiSuggestions = '/ai-suggestions';
 
   /// Build event detail path with ID
   static String eventDetailPath(String id) => '/event/$id';
 
-  /// Build day view path with optional date
-  static String dayPath([DateTime? date]) {
-    if (date == null) return day;
-    return '$day?date=${date.toIso8601String().split('T')[0]}';
-  }
+  /// Build day view path (legacy - redirects to calendar)
+  static String dayPath([DateTime? date]) => calendar;
 
-  /// Build week view path with optional date
-  static String weekPath([DateTime? date]) {
-    if (date == null) return week;
-    return '$week?date=${date.toIso8601String().split('T')[0]}';
-  }
+  /// Build week view path (legacy - redirects to calendar)
+  static String weekPath([DateTime? date]) => calendar;
 
-  /// Build month view path with optional date
-  static String monthPath([DateTime? date]) {
-    if (date == null) return month;
-    return '$month?date=${date.toIso8601String().split('T')[0]}';
-  }
+  /// Build month view path (legacy - redirects to calendar)
+  static String monthPath([DateTime? date]) => calendar;
 
   /// Build reflection path with optional date
   static String reflectionPath([DateTime? date]) {
@@ -70,66 +78,68 @@ final GlobalKey<NavigatorState> shellNavigatorKey =
 /// App router configuration
 final GoRouter appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
-  initialLocation: AppRoutes.home,
+  initialLocation: AppRoutes.calendar,
   debugLogDiagnostics: true,
   routes: [
-    // Shell route for bottom navigation
+    // Authentication routes (outside shell)
+    GoRoute(
+      path: AppRoutes.auth,
+      name: 'auth',
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const AuthScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.signIn,
+      name: 'sign-in',
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const SignInScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.signUp,
+      name: 'sign-up',
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const SignUpScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.onboarding,
+      name: 'onboarding',
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const OnboardingScreen(),
+    ),
+
+    // Shell route with 5-tab bottom navigation
     ShellRoute(
       navigatorKey: shellNavigatorKey,
-      builder: (context, state, child) => _ScaffoldWithNavigation(child: child),
+      builder: (context, state, child) => MainShell(child: child),
       routes: [
-        // Home (Today view)
+        // Tab 1: Calendar
         GoRoute(
-          path: AppRoutes.home,
-          name: 'home',
+          path: AppRoutes.calendar,
+          name: 'calendar',
           pageBuilder: (context, state) => const NoTransitionPage(
-            child: HomeScreen(),
+            child: CalendarScreen(),
           ),
         ),
 
-        // Day view
+        // Tab 2: Inbox
         GoRoute(
-          path: AppRoutes.day,
-          name: 'day',
-          pageBuilder: (context, state) {
-            final dateStr = state.uri.queryParameters['date'];
-            final date =
-                dateStr != null ? DateTime.tryParse(dateStr) : DateTime.now();
-            return NoTransitionPage(
-              child: DayViewScreen(initialDate: date ?? DateTime.now()),
-            );
-          },
+          path: AppRoutes.inbox,
+          name: 'inbox',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: InboxScreen(),
+          ),
         ),
 
-        // Week view
+        // Tab 3: Suggestions
         GoRoute(
-          path: AppRoutes.week,
-          name: 'week',
-          pageBuilder: (context, state) {
-            final dateStr = state.uri.queryParameters['date'];
-            final date =
-                dateStr != null ? DateTime.tryParse(dateStr) : DateTime.now();
-            return NoTransitionPage(
-              child: WeekViewScreen(initialDate: date ?? DateTime.now()),
-            );
-          },
+          path: AppRoutes.suggestions,
+          name: 'suggestions',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: AiSuggestionsScreen(),
+          ),
         ),
 
-        // Month view
-        GoRoute(
-          path: AppRoutes.month,
-          name: 'month',
-          pageBuilder: (context, state) {
-            final dateStr = state.uri.queryParameters['date'];
-            final date =
-                dateStr != null ? DateTime.tryParse(dateStr) : DateTime.now();
-            return NoTransitionPage(
-              child: MonthViewScreen(initialDate: date ?? DateTime.now()),
-            );
-          },
-        ),
-
-        // Reflection
+        // Tab 4: Reflection
         GoRoute(
           path: AppRoutes.reflection,
           name: 'reflection',
@@ -143,25 +153,7 @@ final GoRouter appRouter = GoRouter(
           },
         ),
 
-        // Friends
-        GoRoute(
-          path: AppRoutes.friends,
-          name: 'friends',
-          pageBuilder: (context, state) => const NoTransitionPage(
-            child: FriendsScreen(),
-          ),
-        ),
-
-        // Inbox
-        GoRoute(
-          path: AppRoutes.inbox,
-          name: 'inbox',
-          pageBuilder: (context, state) => const NoTransitionPage(
-            child: InboxScreen(),
-          ),
-        ),
-
-        // Settings
+        // Tab 5: Settings
         GoRoute(
           path: AppRoutes.settings,
           name: 'settings',
@@ -169,19 +161,10 @@ final GoRouter appRouter = GoRouter(
             child: SettingsScreen(),
           ),
         ),
-
-        // AI Suggestions
-        GoRoute(
-          path: AppRoutes.aiSuggestions,
-          name: 'ai-suggestions',
-          pageBuilder: (context, state) => const NoTransitionPage(
-            child: AiSuggestionsScreen(),
-          ),
-        ),
       ],
     ),
 
-    // Full-screen routes (outside shell)
+    // Full-screen routes (outside shell, no bottom nav)
     GoRoute(
       path: AppRoutes.createEvent,
       name: 'create-event',
@@ -202,156 +185,52 @@ final GoRouter appRouter = GoRouter(
         return EventDetailScreen(eventId: id);
       },
     ),
+
+    // Legacy route redirects
+    GoRoute(
+      path: '/',
+      redirect: (context, state) => AppRoutes.calendar,
+    ),
   ],
 
   // Error handling
   errorBuilder: (context, state) => _ErrorScreen(error: state.error),
 
-  // Redirect logic (for auth, etc.)
-  redirect: (context, state) {
-    // Add authentication redirects here
-    // final isAuthenticated = authProvider.isAuthenticated;
-    // final isLoggingIn = state.matchedLocation == '/login';
-    // if (!isAuthenticated && !isLoggingIn) return '/login';
-    // if (isAuthenticated && isLoggingIn) return '/';
+  // Redirect logic for auth and onboarding
+  redirect: (context, state) async {
+    final supabase = Supabase.instance.client;
+    final isAuthenticated = supabase.auth.currentSession != null;
+    final isAuthRoute = state.matchedLocation.startsWith('/auth') ||
+        state.matchedLocation == '/sign-in' ||
+        state.matchedLocation == '/sign-up';
+    final isOnboardingRoute = state.matchedLocation == '/onboarding';
+
+    // If not authenticated and not on an auth route, redirect to auth
+    if (!isAuthenticated && !isAuthRoute) return AppRoutes.auth;
+
+    // If authenticated, check onboarding status
+    if (isAuthenticated) {
+      // If on an auth route, redirect to calendar (onboarding will check later)
+      if (isAuthRoute) return AppRoutes.calendar;
+
+      // Check if onboarding is complete
+      final prefs = await SharedPreferences.getInstance();
+      final onboardingComplete = prefs.getBool(OnboardingKeys.onboardingComplete) ?? false;
+
+      // If onboarding not complete and not on onboarding route, redirect to onboarding
+      if (!onboardingComplete && !isOnboardingRoute) {
+        return AppRoutes.onboarding;
+      }
+
+      // If onboarding is complete and on onboarding route, redirect to calendar
+      if (onboardingComplete && isOnboardingRoute) {
+        return AppRoutes.calendar;
+      }
+    }
+
     return null;
   },
 );
-
-/// Scaffold with bottom navigation
-class _ScaffoldWithNavigation extends StatelessWidget {
-  final Widget child;
-
-  const _ScaffoldWithNavigation({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _calculateSelectedIndex(context),
-        onDestinationSelected: (index) => _onItemTapped(index, context),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.today_outlined),
-            selectedIcon: Icon(Icons.today),
-            label: 'Today',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_view_week_outlined),
-            selectedIcon: Icon(Icons.calendar_view_week),
-            label: 'Week',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month),
-            label: 'Month',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.auto_awesome_outlined),
-            selectedIcon: Icon(Icons.auto_awesome),
-            label: 'AI',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.more_horiz),
-            selectedIcon: Icon(Icons.more_horiz),
-            label: 'More',
-          ),
-        ],
-      ),
-    );
-  }
-
-  int _calculateSelectedIndex(BuildContext context) {
-    final location = GoRouterState.of(context).matchedLocation;
-    if (location == AppRoutes.home || location == AppRoutes.day) return 0;
-    if (location == AppRoutes.week) return 1;
-    if (location == AppRoutes.month) return 2;
-    if (location == AppRoutes.aiSuggestions) return 3;
-    if (location == AppRoutes.reflection ||
-        location == AppRoutes.friends ||
-        location == AppRoutes.inbox ||
-        location == AppRoutes.settings) return 4;
-    return 0;
-  }
-
-  void _onItemTapped(int index, BuildContext context) {
-    switch (index) {
-      case 0:
-        context.go(AppRoutes.home);
-        break;
-      case 1:
-        context.go(AppRoutes.week);
-        break;
-      case 2:
-        context.go(AppRoutes.month);
-        break;
-      case 3:
-        context.go(AppRoutes.aiSuggestions);
-        break;
-      case 4:
-        _showMoreMenu(context);
-        break;
-    }
-  }
-
-  void _showMoreMenu(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.edit_note),
-              title: const Text('Daily Reflection'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go(AppRoutes.reflection);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.people_outline),
-              title: const Text('Friends'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go(AppRoutes.friends);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.inbox_outlined),
-              title: const Text('Inbox'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go(AppRoutes.inbox);
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.settings_outlined),
-              title: const Text('Settings'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go(AppRoutes.settings);
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 /// Error screen for navigation errors
 class _ErrorScreen extends StatelessWidget {
@@ -389,8 +268,8 @@ class _ErrorScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () => context.go(AppRoutes.home),
-                child: const Text('Go Home'),
+                onPressed: () => context.go(AppRoutes.calendar),
+                child: const Text('Go to Calendar'),
               ),
             ],
           ),
@@ -413,15 +292,6 @@ extension GoRouterExtension on BuildContext {
       go(AppRoutes.createEvent);
     }
   }
-
-  /// Navigate to day view
-  void goToDay([DateTime? date]) => go(AppRoutes.dayPath(date));
-
-  /// Navigate to week view
-  void goToWeek([DateTime? date]) => go(AppRoutes.weekPath(date));
-
-  /// Navigate to month view
-  void goToMonth([DateTime? date]) => go(AppRoutes.monthPath(date));
 
   /// Navigate to reflection
   void goToReflection([DateTime? date]) => go(AppRoutes.reflectionPath(date));

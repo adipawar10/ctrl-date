@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../database/database.dart';
+import '../database/database.dart' hide Event;
 import '../main.dart';
 import '../models/event.dart';
 import '../services/api_service.dart';

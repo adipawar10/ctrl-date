@@ -255,8 +255,8 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         children: [
           _QuickActionChip(
-            icon: Icons.auto_awesome,
-            label: 'AI Suggestions',
+            icon: Icons.lightbulb_outline,
+            label: 'Suggestions',
             onTap: () => context.go(AppRoutes.aiSuggestions),
           ),
           const SizedBox(width: AppSpacing.sm),

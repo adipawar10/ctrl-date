@@ -166,7 +166,7 @@ class AppDatabase extends _$AppDatabase {
   ) async {
     await into(syncMetadata).insertOnConflictUpdate(
       SyncMetadataCompanion.insert(
-        tableName: tableName,
+        syncTable: tableName,
         lastSyncAt: Value(lastSyncAt),
         lastSyncVersion: Value(version),
       ),
@@ -175,7 +175,7 @@ class AppDatabase extends _$AppDatabase {
 
   Future<SyncMetadataData?> getSyncMetadata(String tableName) async {
     return await (select(syncMetadata)
-          ..where((m) => m.tableName.equals(tableName)))
+          ..where((m) => m.syncTable.equals(tableName)))
         .getSingleOrNull();
   }
 
@@ -188,7 +188,7 @@ class AppDatabase extends _$AppDatabase {
   }) async {
     await into(pendingSyncOperations).insert(
       PendingSyncOperationsCompanion.insert(
-        tableName: tableName,
+        syncTable: tableName,
         recordId: recordId,
         operation: operation,
         data: Value(data),
@@ -244,7 +244,7 @@ class AppDatabase extends _$AppDatabase {
         orElse: () => models.EventPriority.medium,
       ),
       color: row.color,
-      tags: _parseJsonList(row.tags),
+      tags: _parseJsonList(row.tags).cast<String>(),
       recurrenceRule: row.recurrenceRule != null
           ? models.RecurrenceRule.fromJson(
               _parseJson(row.recurrenceRule!) as Map<String, dynamic>,

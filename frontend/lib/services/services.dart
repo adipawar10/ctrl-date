@@ -6,3 +6,4 @@ export 'auth_service.dart';
 export 'sync_service.dart';
 export 'encryption_service.dart';
 export 'notification_service.dart';
+export 'streak_service.dart';

@@ -1,16 +1,14 @@
-/// Ctrl+Shift+Date - AI Suggestions Screen
-/// View and apply AI scheduling suggestions
+/// Ctrl+Shift+Date - Suggestions Screen
+/// View and manage scheduling suggestions
 library;
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../router.dart';
+import '../models/suggestion.dart';
 import '../theme.dart';
-import '../widgets/priority_indicator.dart';
 
-/// AI suggestions screen
+/// Suggestions screen
 class AiSuggestionsScreen extends StatefulWidget {
   const AiSuggestionsScreen({super.key});
 
@@ -21,78 +19,64 @@ class AiSuggestionsScreen extends StatefulWidget {
 class _AiSuggestionsScreenState extends State<AiSuggestionsScreen> {
   bool _isLoading = false;
   bool _hasError = false;
-  DateTime _startDate = DateTime.now();
-  DateTime _endDate = DateTime.now().add(const Duration(days: 7));
 
-  // Mock data - replace with actual state management
-  final Map<String, dynamic> _analysis = {
-    'utilization': 0.65,
-    'focus_time_hours': 12.5,
-    'meeting_hours': 8.0,
-    'identified_gaps': [
-      'No dedicated focus time blocks on Monday',
-      'Back-to-back meetings on Wednesday',
-      'Missing lunch breaks on most days',
-    ],
-  };
-
-  final List<Map<String, dynamic>> _suggestions = [
-    {
-      'id': 'sug_001',
-      'type': 'add_event',
-      'title': 'Focus Block: Deep Work',
-      'proposed_start': DateTime.now().add(const Duration(days: 1, hours: 9)),
-      'proposed_end': DateTime.now().add(const Duration(days: 1, hours: 11)),
-      'reasoning':
+  // Mock suggestions data - replace with actual state management
+  final List<Suggestion> _suggestions = [
+    Suggestion(
+      id: 'sug_001',
+      title: 'Focus Block: Deep Work',
+      durationMinutes: 120,
+      suggestedStart: DateTime.now().add(const Duration(days: 1, hours: 9)),
+      suggestedEnd: DateTime.now().add(const Duration(days: 1, hours: 11)),
+      reason:
           'Your productivity data shows you work best in the morning. Adding a focus block here maximizes your cognitive peak.',
-      'confidence': 0.92,
-      'category': 'focus_time',
-    },
-    {
-      'id': 'sug_002',
-      'type': 'reschedule',
-      'title': 'Move: Code Review',
-      'event_id': '123',
-      'proposed_start': DateTime.now().add(const Duration(days: 2, hours: 14)),
-      'proposed_end': DateTime.now().add(const Duration(days: 2, hours: 15)),
-      'reasoning':
-          'This event conflicts with your regular standup. Moving it to afternoon creates a better flow.',
-      'confidence': 0.78,
-      'category': 'task',
-    },
-    {
-      'id': 'sug_003',
-      'type': 'add_event',
-      'title': 'Break: Lunch',
-      'proposed_start': DateTime.now().add(const Duration(days: 3, hours: 12)),
-      'proposed_end': DateTime.now().add(const Duration(days: 3, hours: 13)),
-      'reasoning':
-          'You\'ve been skipping lunch. Regular breaks improve afternoon productivity by 20%.',
-      'confidence': 0.85,
-      'category': 'break',
-    },
+    ),
+    Suggestion(
+      id: 'sug_002',
+      title: 'Code Review Session',
+      durationMinutes: 60,
+      suggestedStart: DateTime.now().add(const Duration(days: 2, hours: 14)),
+      suggestedEnd: DateTime.now().add(const Duration(days: 2, hours: 15)),
+      reason:
+          'You have pending code reviews. This slot is free and follows your usual review pattern.',
+    ),
+    Suggestion(
+      id: 'sug_003',
+      title: 'Lunch Break',
+      durationMinutes: 60,
+      suggestedStart: DateTime.now().add(const Duration(days: 3, hours: 12)),
+      suggestedEnd: DateTime.now().add(const Duration(days: 3, hours: 13)),
+      reason:
+          'You have been skipping lunch. Regular breaks improve afternoon productivity by 20%.',
+    ),
+    Suggestion(
+      id: 'sug_004',
+      title: 'Team Sync',
+      durationMinutes: 30,
+      suggestedStart: DateTime.now().add(const Duration(days: 1, hours: 15)),
+      suggestedEnd:
+          DateTime.now().add(const Duration(days: 1, hours: 15, minutes: 30)),
+      reason:
+          'Weekly team sync is due. This time works for all team members based on their calendars.',
+    ),
   ];
 
-  final Set<String> _appliedSuggestions = {};
-  final Set<String> _rejectedSuggestions = {};
+  final Set<String> _dismissedSuggestions = {};
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final activeSuggestions = _suggestions
+        .where((s) => !_dismissedSuggestions.contains(s.id))
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI Suggestions'),
+        title: const Text('Suggestions'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _isLoading ? null : _refreshSuggestions,
             tooltip: 'Refresh suggestions',
-          ),
-          IconButton(
-            icon: const Icon(Icons.tune),
-            onPressed: _showSettings,
-            tooltip: 'Settings',
           ),
         ],
       ),
@@ -100,479 +84,142 @@ class _AiSuggestionsScreenState extends State<AiSuggestionsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _hasError
               ? _buildErrorState(context)
-              : RefreshIndicator(
-                  onRefresh: _refreshSuggestions,
-                  child: CustomScrollView(
-                    slivers: [
-                      // Date range selector
-                      SliverToBoxAdapter(
-                        child: _buildDateRangeSelector(context),
+              : activeSuggestions.isEmpty
+                  ? _buildEmptyState(context)
+                  : RefreshIndicator(
+                      onRefresh: _refreshSuggestions,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        itemCount: activeSuggestions.length,
+                        itemBuilder: (context, index) {
+                          final suggestion = activeSuggestions[index];
+                          return Padding(
+                            padding:
+                                const EdgeInsets.only(bottom: AppSpacing.md),
+                            child: _buildSuggestionCard(context, suggestion),
+                          );
+                        },
                       ),
-
-                      // Analysis section
-                      SliverToBoxAdapter(
-                        child: _buildAnalysisSection(context),
-                      ),
-
-                      // Identified gaps
-                      SliverToBoxAdapter(
-                        child: _buildGapsSection(context),
-                      ),
-
-                      // Suggestions header
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.md,
-                            AppSpacing.lg,
-                            AppSpacing.md,
-                            AppSpacing.sm,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Suggestions',
-                                style: theme.textTheme.titleLarge,
-                              ),
-                              Text(
-                                '${_suggestions.length - _appliedSuggestions.length - _rejectedSuggestions.length} pending',
-                                style: theme.textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Suggestions list
-                      _suggestions.isEmpty
-                          ? SliverFillRemaining(
-                              child: _buildEmptyState(context),
-                            )
-                          : SliverPadding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.md,
-                              ),
-                              sliver: SliverList(
-                                delegate: SliverChildBuilderDelegate(
-                                  (context, index) {
-                                    final suggestion = _suggestions[index];
-                                    final isApplied = _appliedSuggestions
-                                        .contains(suggestion['id']);
-                                    final isRejected = _rejectedSuggestions
-                                        .contains(suggestion['id']);
-
-                                    return Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: AppSpacing.md,
-                                      ),
-                                      child: _buildSuggestionCard(
-                                        context,
-                                        suggestion,
-                                        isApplied: isApplied,
-                                        isRejected: isRejected,
-                                      ),
-                                    );
-                                  },
-                                  childCount: _suggestions.length,
-                                ),
-                              ),
-                            ),
-
-                      // Bottom padding
-                      const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
-                    ],
-                  ),
-                ),
+                    ),
     );
   }
 
-  Widget _buildDateRangeSelector(BuildContext context) {
+  Widget _buildSuggestionCard(BuildContext context, Suggestion suggestion) {
     final theme = Theme.of(context);
+    final timeFormat = DateFormat('h:mm a');
+    final dateFormat = DateFormat('EEE, MMM d');
+
+    final timeWindow =
+        '${timeFormat.format(suggestion.suggestedStart)} - ${timeFormat.format(suggestion.suggestedEnd)}';
+    final dateString = dateFormat.format(suggestion.suggestedStart);
 
     return Container(
-      margin: const EdgeInsets.all(AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
+        color: AppColors.white,
         border: Border.all(color: AppColors.gray200),
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _selectDate(isStart: true),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('From', style: theme.textTheme.labelSmall),
-                  const SizedBox(height: 4),
-                  Text(
-                    DateFormat('MMM d, yyyy').format(_startDate),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const Icon(Icons.arrow_forward, color: AppColors.gray400),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _selectDate(isStart: false),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('To', style: theme.textTheme.labelSmall),
-                  const SizedBox(height: 4),
-                  Text(
-                    DateFormat('MMM d, yyyy').format(_endDate),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAnalysisSection(BuildContext context) {
-    final theme = Theme.of(context);
-    final utilization = _analysis['utilization'] as double;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.gray100,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Title (bold)
           Text(
-            'Schedule Analysis',
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: _buildAnalysisStat(
-                  context,
-                  label: 'Utilization',
-                  value: '${(utilization * 100).toInt()}%',
-                  icon: Icons.pie_chart,
-                ),
-              ),
-              Expanded(
-                child: _buildAnalysisStat(
-                  context,
-                  label: 'Focus Time',
-                  value: '${_analysis['focus_time_hours']}h',
-                  icon: Icons.psychology,
-                ),
-              ),
-              Expanded(
-                child: _buildAnalysisStat(
-                  context,
-                  label: 'Meetings',
-                  value: '${_analysis['meeting_hours']}h',
-                  icon: Icons.groups,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAnalysisStat(
-    BuildContext context, {
-    required String label,
-    required String value,
-    required IconData icon,
-  }) {
-    final theme = Theme.of(context);
-
-    return Column(
-      children: [
-        Icon(icon, size: 24, color: AppColors.gray600),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        Text(label, style: theme.textTheme.labelSmall),
-      ],
-    );
-  }
-
-  Widget _buildGapsSection(BuildContext context) {
-    final theme = Theme.of(context);
-    final gaps = _analysis['identified_gaps'] as List<String>;
-
-    if (gaps.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.all(AppSpacing.md),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        color: AppColors.warning.withValues(alpha: 0.05),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.lightbulb_outline, size: 18, color: AppColors.warning),
-              const SizedBox(width: 8),
-              Text(
-                'Identified Opportunities',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: AppColors.warning,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          ...gaps.map((gap) => Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('  - ', style: TextStyle(color: AppColors.gray600)),
-                    Expanded(
-                      child: Text(
-                        gap,
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                  ],
-                ),
-              )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSuggestionCard(
-    BuildContext context,
-    Map<String, dynamic> suggestion, {
-    required bool isApplied,
-    required bool isRejected,
-  }) {
-    final theme = Theme.of(context);
-    final type = suggestion['type'] as String;
-    final confidence = suggestion['confidence'] as double;
-    final category = suggestion['category'] as String?;
-
-    Color categoryColor;
-    IconData categoryIcon;
-    switch (category) {
-      case 'focus_time':
-        categoryColor = AppColors.priorityHigh;
-        categoryIcon = Icons.psychology;
-        break;
-      case 'break':
-        categoryColor = AppColors.priorityLow;
-        categoryIcon = Icons.coffee;
-        break;
-      case 'meeting':
-        categoryColor = AppColors.priorityMedium;
-        categoryIcon = Icons.groups;
-        break;
-      default:
-        categoryColor = AppColors.gray600;
-        categoryIcon = Icons.event;
-    }
-
-    return Opacity(
-      opacity: isApplied || isRejected ? 0.5 : 1.0,
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: isApplied
-              ? AppColors.completed.withValues(alpha: 0.1)
-              : isRejected
-                  ? AppColors.gray100
-                  : AppColors.white,
-          border: Border.all(
-            color: isApplied
-                ? AppColors.completed
-                : isRejected
-                    ? AppColors.gray300
-                    : AppColors.gray200,
-          ),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: categoryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(categoryIcon, size: 20, color: categoryColor),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        suggestion['title'],
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      Text(
-                        type == 'add_event'
-                            ? 'Add new event'
-                            : type == 'reschedule'
-                                ? 'Reschedule existing'
-                                : 'Remove event',
-                        style: theme.textTheme.labelSmall,
-                      ),
-                    ],
-                  ),
-                ),
-                _buildConfidenceBadge(context, confidence),
-              ],
+            suggestion.title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
+          ),
 
-            const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm),
 
-            // Time
-            if (suggestion['proposed_start'] != null)
-              Row(
-                children: [
-                  Icon(Icons.access_time, size: 16, color: AppColors.gray600),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${DateFormat('EEE, MMM d').format(suggestion['proposed_start'])} at ${DateFormat('HH:mm').format(suggestion['proposed_start'])} - ${DateFormat('HH:mm').format(suggestion['proposed_end'])}',
-                    style: theme.textTheme.bodySmall,
+          // Duration and time window row
+          Row(
+            children: [
+              // Duration chip
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.gray100,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                child: Text(
+                  suggestion.formattedDuration,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.gray700,
+                    fontWeight: FontWeight.w500,
                   ),
-                ],
+                ),
               ),
 
-            const SizedBox(height: AppSpacing.sm),
+              const SizedBox(width: AppSpacing.sm),
 
-            // Reasoning
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.sm),
-              decoration: BoxDecoration(
-                color: AppColors.gray100,
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.auto_awesome,
-                    size: 16,
+              // Time window
+              const Icon(Icons.access_time, size: 16, color: AppColors.gray600),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  '$dateString, $timeWindow',
+                  style: theme.textTheme.bodySmall?.copyWith(
                     color: AppColors.gray600,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      suggestion['reasoning'],
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ),
-                ],
+                ),
               ),
+            ],
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          // Reason text
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: AppColors.gray100,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.lightbulb_outline,
+                  size: 16,
+                  color: AppColors.gray600,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    suggestion.reason,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          ),
 
-            // Status or actions
-            const SizedBox(height: AppSpacing.md),
-            if (isApplied)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.check_circle, size: 16, color: AppColors.completed),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Applied',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: AppColors.completed,
-                    ),
-                  ),
-                ],
-              )
-            else if (isRejected)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.cancel, size: 16, color: AppColors.gray500),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Dismissed',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: AppColors.gray500,
-                    ),
-                  ),
-                ],
-              )
-            else
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => _rejectSuggestion(suggestion['id']),
-                      child: const Text('Dismiss'),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: () => _applySuggestion(suggestion['id']),
-                      child: const Text('Apply'),
-                    ),
-                  ),
-                ],
+          const SizedBox(height: AppSpacing.md),
+
+          // Action buttons
+          Row(
+            children: [
+              // Dismiss button (TextButton)
+              TextButton(
+                onPressed: () => _dismissSuggestion(suggestion.id),
+                child: const Text('Dismiss'),
               ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildConfidenceBadge(BuildContext context, double confidence) {
-    final theme = Theme.of(context);
-    final percentage = (confidence * 100).toInt();
+              const Spacer(),
 
-    Color color;
-    if (confidence >= 0.8) {
-      color = AppColors.completed;
-    } else if (confidence >= 0.6) {
-      color = AppColors.warning;
-    } else {
-      color = AppColors.gray500;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppRadius.full),
-      ),
-      child: Text(
-        '$percentage%',
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
+              // Add to Calendar button (ElevatedButton)
+              ElevatedButton(
+                onPressed: () => _addToCalendar(suggestion),
+                child: const Text('Add to Calendar'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -587,7 +234,7 @@ class _AiSuggestionsScreenState extends State<AiSuggestionsScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.auto_awesome,
+              Icons.lightbulb_outline,
               size: 64,
               color: theme.colorScheme.outline,
             ),
@@ -619,7 +266,7 @@ class _AiSuggestionsScreenState extends State<AiSuggestionsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               Icons.error_outline,
               size: 64,
               color: AppColors.error,
@@ -648,29 +295,6 @@ class _AiSuggestionsScreenState extends State<AiSuggestionsScreen> {
     );
   }
 
-  Future<void> _selectDate({required bool isStart}) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: isStart ? _startDate : _endDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 30)),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-
-    if (picked != null) {
-      setState(() {
-        if (isStart) {
-          _startDate = picked;
-          if (_endDate.isBefore(_startDate)) {
-            _endDate = _startDate.add(const Duration(days: 7));
-          }
-        } else {
-          _endDate = picked;
-        }
-      });
-      _refreshSuggestions();
-    }
-  }
-
   Future<void> _refreshSuggestions() async {
     setState(() {
       _isLoading = true;
@@ -683,8 +307,7 @@ class _AiSuggestionsScreenState extends State<AiSuggestionsScreen> {
 
       setState(() {
         _isLoading = false;
-        _appliedSuggestions.clear();
-        _rejectedSuggestions.clear();
+        _dismissedSuggestions.clear();
       });
     } catch (e) {
       setState(() {
@@ -694,91 +317,47 @@ class _AiSuggestionsScreenState extends State<AiSuggestionsScreen> {
     }
   }
 
-  void _applySuggestion(String suggestionId) {
+  void _dismissSuggestion(String suggestionId) {
+    setState(() {
+      _dismissedSuggestions.add(suggestionId);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Suggestion dismissed')),
+    );
+  }
+
+  void _addToCalendar(Suggestion suggestion) {
+    // Show confirmation dialog - never auto-add
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Apply Suggestion'),
-        content: const Text(
-          'This will create/modify the event in your calendar. Continue?',
+        title: const Text('Add to Calendar'),
+        content: Text(
+          'Add "${suggestion.title}" to your calendar?\n\n'
+          'This will create an event from '
+          '${DateFormat('h:mm a').format(suggestion.suggestedStart)} to '
+          '${DateFormat('h:mm a').format(suggestion.suggestedEnd)} on '
+          '${DateFormat('EEEE, MMMM d').format(suggestion.suggestedStart)}.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               setState(() {
-                _appliedSuggestions.add(suggestionId);
+                _dismissedSuggestions.add(suggestion.id);
               });
-              // TODO: Call API to apply suggestion
+              // TODO: Call API to create event
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Suggestion applied')),
+                SnackBar(content: Text('"${suggestion.title}" added to calendar')),
               );
             },
-            child: const Text('Apply'),
+            child: const Text('Add'),
           ),
         ],
-      ),
-    );
-  }
-
-  void _rejectSuggestion(String suggestionId) {
-    setState(() {
-      _rejectedSuggestions.add(suggestionId);
-    });
-    // TODO: Send feedback to API
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Suggestion dismissed')),
-    );
-  }
-
-  void _showSettings() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'AI Settings',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              SwitchListTile(
-                title: const Text('Focus time suggestions'),
-                subtitle: const Text('Suggest deep work blocks'),
-                value: true,
-                onChanged: (value) {},
-              ),
-              SwitchListTile(
-                title: const Text('Break suggestions'),
-                subtitle: const Text('Suggest rest periods'),
-                value: true,
-                onChanged: (value) {},
-              ),
-              SwitchListTile(
-                title: const Text('Reschedule suggestions'),
-                subtitle: const Text('Suggest moving events'),
-                value: true,
-                onChanged: (value) {},
-              ),
-              const SizedBox(height: AppSpacing.md),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Done'),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

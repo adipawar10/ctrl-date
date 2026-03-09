@@ -49,7 +49,7 @@ class NotificationService {
     );
 
     await plugin.initialize(
-      initSettings,
+      settings: initSettings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
       onDidReceiveBackgroundNotificationResponse: _onBackgroundNotificationTapped,
     );
@@ -124,11 +124,11 @@ class NotificationService {
     final notificationId = _generateNotificationId(event.id, reminder.id);
 
     await _plugin!.zonedSchedule(
-      notificationId,
-      'Event Reminder',
-      '${event.title} starts in ${reminder.minutesBefore} minutes',
-      tz.TZDateTime.from(scheduledTime, tz.local),
-      NotificationDetails(
+      id: notificationId,
+      title: 'Event Reminder',
+      body: '${event.title} starts in ${reminder.minutesBefore} minutes',
+      scheduledDate: tz.TZDateTime.from(scheduledTime, tz.local),
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _channelIdReminders,
           'Reminders',
@@ -145,8 +145,6 @@ class NotificationService {
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
       payload: 'event:${event.id}',
     );
   }
@@ -156,7 +154,7 @@ class NotificationService {
     if (_plugin == null) return;
 
     final notificationId = _generateNotificationId(eventId, reminderId);
-    await _plugin!.cancel(notificationId);
+    await _plugin!.cancel(id: notificationId);
   }
 
   /// Cancel all reminders for an event
@@ -166,7 +164,7 @@ class NotificationService {
     // Cancel up to 10 potential reminders per event
     for (var i = 0; i < 10; i++) {
       final notificationId = _generateNotificationId(eventId, i.toString());
-      await _plugin!.cancel(notificationId);
+      await _plugin!.cancel(id: notificationId);
     }
   }
 
@@ -179,10 +177,10 @@ class NotificationService {
     final notificationId = message.id.hashCode;
 
     await _plugin!.show(
-      notificationId,
-      message.title,
-      message.body,
-      NotificationDetails(
+      id: notificationId,
+      title: message.title,
+      body: message.body,
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           channelId,
           _getChannelName(channelId),
@@ -217,10 +215,10 @@ class NotificationService {
     final body = messages[pokeType] ?? '$senderName sent you a poke!';
 
     await _plugin!.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      'Poke',
-      body,
-      NotificationDetails(
+      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title: 'Poke',
+      body: body,
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _channelIdSocial,
           'Social',
@@ -266,10 +264,10 @@ class NotificationService {
     }
 
     await _plugin!.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title,
-      body,
-      const NotificationDetails(
+      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title: title,
+      body: body,
+      notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
           _channelIdSystem,
           'System',
@@ -289,7 +287,7 @@ class NotificationService {
     if (!_settings.reflectionReminders) return;
 
     // Cancel existing reminder
-    await _plugin!.cancel(_reflectionReminderId);
+    await _plugin!.cancel(id: _reflectionReminderId);
 
     // Parse time string (HH:mm format)
     final parts = timeString.split(':');
@@ -319,11 +317,11 @@ class NotificationService {
     }
 
     await _plugin!.zonedSchedule(
-      _reflectionReminderId,
-      'Daily Reflection',
-      'Take a moment to reflect on your day',
-      scheduledTime,
-      const NotificationDetails(
+      id: _reflectionReminderId,
+      title: 'Daily Reflection',
+      body: 'Take a moment to reflect on your day',
+      scheduledDate: scheduledTime,
+      notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
           _channelIdReminders,
           'Reminders',
@@ -334,8 +332,6 @@ class NotificationService {
         iOS: DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
       payload: 'reflection',
     );
@@ -344,7 +340,7 @@ class NotificationService {
   /// Cancel daily reflection reminder
   Future<void> cancelDailyReflectionReminder() async {
     if (_plugin == null) return;
-    await _plugin!.cancel(_reflectionReminderId);
+    await _plugin!.cancel(id: _reflectionReminderId);
   }
 
   /// Update notification settings

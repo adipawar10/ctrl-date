@@ -43,7 +43,7 @@ dependencies:
   json_annotation: ^4.8.1
 
   # Notifications
-  flutter_local_notifications: ^16.3.0
+  flutter_local_notifications: ^21.0.0
 
   # Local Storage
   shared_preferences: ^2.2.2
@@ -59,7 +59,7 @@ dependencies:
   # Platform Utils
   url_launcher: ^6.2.3
   share_plus: ^7.2.1
-  package_info_plus: ^5.0.1
+  package_info_plus: 9.0.0
   image_picker: ^1.0.7
 
 dev_dependencies:

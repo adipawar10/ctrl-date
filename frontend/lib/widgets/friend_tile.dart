@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../theme.dart';
+import 'streak_badge.dart';
 
 /// Friend tile widget for displaying friend in a list
 class FriendTile extends StatelessWidget {
@@ -27,6 +28,12 @@ class FriendTile extends StatelessWidget {
   /// Last active timestamp
   final DateTime? lastActive;
 
+  /// Current streak count
+  final int streakCount;
+
+  /// Longest streak count
+  final int longestStreak;
+
   /// Callback when tile is tapped
   final VoidCallback? onTap;
 
@@ -41,6 +48,8 @@ class FriendTile extends StatelessWidget {
     this.avatarUrl,
     this.isOnline = false,
     this.lastActive,
+    this.streakCount = 0,
+    this.longestStreak = 0,
     this.onTap,
     this.onPoke,
   });
@@ -66,13 +75,22 @@ class FriendTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: onPoke != null
-          ? IconButton(
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (streakCount > 0)
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.xs),
+              child: StreakBadge(count: streakCount, compact: true),
+            ),
+          if (onPoke != null)
+            IconButton(
               icon: const Icon(Icons.touch_app_outlined),
               onPressed: onPoke,
               tooltip: 'Poke',
-            )
-          : null,
+            ),
+        ],
+      ),
     );
   }
 

@@ -21,6 +21,7 @@ Ctrl+Shift+Date helps users plan their days and weeks, balance fixed commitments
 ### Design Philosophy
 
 The app uses a **minimalist black and white design**. Color is reserved exclusively for semantic meaning:
+
 - Priority levels (green → red)
 - Completion states
 - Conflict warnings
@@ -89,6 +90,7 @@ cp backend/.env.example backend/.env
 ```
 
 Required variables:
+
 ```env
 # Supabase
 SUPABASE_URL=https://your-project.supabase.co
@@ -196,16 +198,21 @@ Full API documentation available at `/docs` when running the backend.
 ## Architecture Highlights
 
 ### Offline-First Sync
+
 All data is stored locally in SQLite (Drift) and syncs to the server when online. Conflicts are resolved using version numbers with last-write-wins semantics.
 
 ### Event Locking
+
 Events marked as "locked" are hard constraints. The AI will never suggest moving them, and creating overlapping locked events is blocked with a 409 error.
 
 ### E2E Encryption
+
 Inbox messages use X25519 key exchange with AES-256-GCM encryption. The server stores only ciphertext and cannot read message contents.
 
 ### AI Guardrails
+
 AI suggestions go through post-processing validation to ensure:
+
 - Locked events are never modified
 - Suggestions don't overlap with locked events
 - Times respect user's working hours

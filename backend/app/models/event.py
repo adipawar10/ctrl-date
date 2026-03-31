@@ -139,6 +139,7 @@ class EventUpdate(BaseModel):
     all_day: Optional[bool] = None
     timezone: Optional[str] = None
     is_locked: Optional[bool] = None
+    is_private: Optional[bool] = None
     priority: Optional[int] = None
     status: Optional[EventStatus] = None
     completion_notes: Optional[str] = None

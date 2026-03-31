@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 import '../models/user.dart';
+import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/encryption_service.dart';
 
@@ -268,11 +269,21 @@ class AuthActions {
 
   /// Delete account
   Future<AuthResult> deleteAccount() async {
-    // Clear all local data
-    await _encryptionService.clearKeys();
+    try {
+      // Call backend to delete all user data
+      final api = ApiService.instance;
+      final response = await api.delete('/auth/account');
 
-    // Sign out (account deletion would be handled by backend)
-    return _authService.signOut();
+      // Clear all local data regardless of server response
+      await _encryptionService.clearKeys();
+
+      // Sign out
+      return _authService.signOut();
+    } catch (e) {
+      // Still clear local data even if server call fails
+      await _encryptionService.clearKeys();
+      return _authService.signOut();
+    }
   }
 }
 

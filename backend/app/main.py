@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import auth, events, calendar_import, sharing, friends, inbox, reflections, ai_suggestions, sync
+from app.routers import auth, events, calendar_import, sharing, friends, inbox, reflections, ai_suggestions, sync, polls
 
 
 @asynccontextmanager
@@ -47,6 +47,7 @@ app.include_router(inbox.router, prefix="/inbox", tags=["Inbox"])
 app.include_router(reflections.router, prefix="/reflections", tags=["Reflections"])
 app.include_router(ai_suggestions.router, prefix="/ai", tags=["AI"])
 app.include_router(sync.router, prefix="/sync", tags=["Sync"])
+app.include_router(polls.router, prefix="/polls", tags=["Polls"])
 
 
 @app.get("/health")

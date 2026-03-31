@@ -37,10 +37,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
     # AI/LLM
-    LLM_PROVIDER: str = "anthropic"  # or "openai"
+    LLM_PROVIDER: str = "gemini"  # "gemini", "anthropic", or "openai"
     ANTHROPIC_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
-    LLM_MODEL: str = "claude-sonnet-4-20250514"
+    GEMINI_API_KEY: str = "AIzaSyCPl-cybH5fgGsM40YmZ5zBodsFi1YOMEI"
+    LLM_MODEL: str = "gemini-2.0-flash"
 
     # Push Notifications
     APNS_KEY_ID: str = ""

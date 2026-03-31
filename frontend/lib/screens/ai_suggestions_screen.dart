@@ -3,65 +3,35 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../models/suggestion.dart';
+import '../providers/events_provider.dart';
 import '../theme.dart';
 
 /// Suggestions screen
-class AiSuggestionsScreen extends StatefulWidget {
+class AiSuggestionsScreen extends ConsumerStatefulWidget {
   const AiSuggestionsScreen({super.key});
 
   @override
-  State<AiSuggestionsScreen> createState() => _AiSuggestionsScreenState();
+  ConsumerState<AiSuggestionsScreen> createState() =>
+      _AiSuggestionsScreenState();
 }
 
-class _AiSuggestionsScreenState extends State<AiSuggestionsScreen> {
+class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
   bool _isLoading = false;
   bool _hasError = false;
-
-  // Mock suggestions data - replace with actual state management
-  final List<Suggestion> _suggestions = [
-    Suggestion(
-      id: 'sug_001',
-      title: 'Focus Block: Deep Work',
-      durationMinutes: 120,
-      suggestedStart: DateTime.now().add(const Duration(days: 1, hours: 9)),
-      suggestedEnd: DateTime.now().add(const Duration(days: 1, hours: 11)),
-      reason:
-          'Your productivity data shows you work best in the morning. Adding a focus block here maximizes your cognitive peak.',
-    ),
-    Suggestion(
-      id: 'sug_002',
-      title: 'Code Review Session',
-      durationMinutes: 60,
-      suggestedStart: DateTime.now().add(const Duration(days: 2, hours: 14)),
-      suggestedEnd: DateTime.now().add(const Duration(days: 2, hours: 15)),
-      reason:
-          'You have pending code reviews. This slot is free and follows your usual review pattern.',
-    ),
-    Suggestion(
-      id: 'sug_003',
-      title: 'Lunch Break',
-      durationMinutes: 60,
-      suggestedStart: DateTime.now().add(const Duration(days: 3, hours: 12)),
-      suggestedEnd: DateTime.now().add(const Duration(days: 3, hours: 13)),
-      reason:
-          'You have been skipping lunch. Regular breaks improve afternoon productivity by 20%.',
-    ),
-    Suggestion(
-      id: 'sug_004',
-      title: 'Team Sync',
-      durationMinutes: 30,
-      suggestedStart: DateTime.now().add(const Duration(days: 1, hours: 15)),
-      suggestedEnd:
-          DateTime.now().add(const Duration(days: 1, hours: 15, minutes: 30)),
-      reason:
-          'Weekly team sync is due. This time works for all team members based on their calendars.',
-    ),
-  ];
+  List<Suggestion> _suggestions = [];
+  Map<String, dynamic>? _analysis;
 
   final Set<String> _dismissedSuggestions = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshSuggestions();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,23 +54,104 @@ class _AiSuggestionsScreenState extends State<AiSuggestionsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _hasError
               ? _buildErrorState(context)
-              : activeSuggestions.isEmpty
+              : activeSuggestions.isEmpty && _analysis == null
                   ? _buildEmptyState(context)
                   : RefreshIndicator(
                       onRefresh: _refreshSuggestions,
-                      child: ListView.builder(
+                      child: ListView(
                         padding: const EdgeInsets.all(AppSpacing.md),
-                        itemCount: activeSuggestions.length,
-                        itemBuilder: (context, index) {
-                          final suggestion = activeSuggestions[index];
-                          return Padding(
-                            padding:
-                                const EdgeInsets.only(bottom: AppSpacing.md),
-                            child: _buildSuggestionCard(context, suggestion),
-                          );
-                        },
+                        children: [
+                          // Schedule analysis card
+                          if (_analysis != null) ...[
+                            _buildAnalysisCard(context),
+                            const SizedBox(height: AppSpacing.md),
+                          ],
+                          // Suggestions list
+                          ...activeSuggestions.map(
+                            (suggestion) => Padding(
+                              padding:
+                                  const EdgeInsets.only(bottom: AppSpacing.md),
+                              child:
+                                  _buildSuggestionCard(context, suggestion),
+                            ),
+                          ),
+                          if (activeSuggestions.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(AppSpacing.lg),
+                              child: Center(
+                                child: Text(
+                                  'All suggestions reviewed!',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.gray500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
+    );
+  }
+
+  Widget _buildAnalysisCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final utilization = ((_analysis?['utilization'] ?? 0) * 100).round();
+    final focusHours = (_analysis?['focus_time_hours'] ?? 0).toStringAsFixed(1);
+    final meetingHours = (_analysis?['meeting_hours'] ?? 0).toStringAsFixed(1);
+    final gaps = (_analysis?['identified_gaps'] as List?)?.cast<String>() ?? [];
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.gray100,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.analytics_outlined, size: 20),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                'Schedule Analysis',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              _AnalysisStat(label: 'Utilization', value: '$utilization%'),
+              _AnalysisStat(label: 'Focus', value: '${focusHours}h'),
+              _AnalysisStat(label: 'Meetings', value: '${meetingHours}h'),
+            ],
+          ),
+          if (gaps.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            ...gaps.map((gap) => Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xs),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 14, color: AppColors.gray500),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      gap,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.gray600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )),
+          ],
+        ],
+      ),
     );
   }
 
@@ -302,13 +353,44 @@ class _AiSuggestionsScreenState extends State<AiSuggestionsScreen> {
     });
 
     try {
-      // TODO: Implement actual API call
-      await Future.delayed(const Duration(seconds: 2));
+      final api = ref.read(apiServiceProvider);
+      final now = DateTime.now();
+      final response = await api.post<Map<String, dynamic>>(
+        '/ai/suggestions',
+        body: {
+          'start_date': now.toIso8601String().split('T')[0],
+          'end_date': now.add(const Duration(days: 7)).toIso8601String().split('T')[0],
+          'max_suggestions': 5,
+        },
+      );
 
-      setState(() {
-        _isLoading = false;
-        _dismissedSuggestions.clear();
-      });
+      if (response.isSuccess && response.data != null) {
+        final data = response.data!;
+        final rawSuggestions = (data['suggestions'] as List?) ?? [];
+
+        setState(() {
+          _suggestions = rawSuggestions.map((s) {
+            final start = DateTime.parse(s['proposed_start']);
+            final end = DateTime.parse(s['proposed_end']);
+            return Suggestion(
+              id: s['id'] ?? '',
+              title: s['title'] ?? s['type'] ?? 'Suggestion',
+              durationMinutes: end.difference(start).inMinutes,
+              suggestedStart: start,
+              suggestedEnd: end,
+              reason: s['reasoning'] ?? '',
+            );
+          }).toList();
+          _analysis = data['analysis'] as Map<String, dynamic>?;
+          _isLoading = false;
+          _dismissedSuggestions.clear();
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -321,6 +403,14 @@ class _AiSuggestionsScreenState extends State<AiSuggestionsScreen> {
     setState(() {
       _dismissedSuggestions.add(suggestionId);
     });
+
+    // Send feedback to backend
+    final api = ref.read(apiServiceProvider);
+    api.post('/ai/suggestions/feedback', body: {
+      'suggestion_id': suggestionId,
+      'accepted': false,
+    });
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Suggestion dismissed')),
     );
@@ -345,17 +435,74 @@ class _AiSuggestionsScreenState extends State<AiSuggestionsScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
               setState(() {
                 _dismissedSuggestions.add(suggestion.id);
               });
-              // TODO: Call API to create event
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('"${suggestion.title}" added to calendar')),
-              );
+
+              try {
+                final api = ref.read(apiServiceProvider);
+                await api.post('/ai/suggestions/${suggestion.id}/apply');
+
+                // Send positive feedback
+                await api.post('/ai/suggestions/feedback', body: {
+                  'suggestion_id': suggestion.id,
+                  'accepted': true,
+                });
+
+                // Refresh events
+                ref.invalidate(eventsProvider);
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                        content:
+                            Text('"${suggestion.title}" added to calendar')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to add: $e')),
+                  );
+                }
+              }
             },
             child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Analysis stat chip
+class _AnalysisStat extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _AnalysisStat({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppColors.gray500,
+            ),
           ),
         ],
       ),

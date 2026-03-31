@@ -184,8 +184,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     setState(() => _connectingGoogle = true);
 
     try {
-      // In a real app, this would use the Google Calendar API OAuth flow
-      // For now, we'll simulate the connection
+      // TODO: Implement Google Calendar OAuth flow
+      // 1. Use google_sign_in package to authenticate
+      // 2. Request calendar.readonly scope
+      // 3. Fetch events via Google Calendar API
+      // 4. Upload to backend /import/google endpoint
       await Future.delayed(const Duration(seconds: 2));
 
       await ref.read(onboardingProvider.notifier).setGoogleCalendarConnected(true);
@@ -213,8 +216,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     setState(() => _connectingApple = true);
 
     try {
-      // Request calendar permissions for Apple Calendar (EventKit)
-      // In a real app, this would use the device_calendar package
+      // TODO: Implement Apple Calendar access via device_calendar package
+      // 1. Request calendar permissions
+      // 2. Read local calendars via EventKit
+      // 3. Import events to our database
       await Future.delayed(const Duration(seconds: 2));
 
       await ref.read(onboardingProvider.notifier).setAppleCalendarConnected(true);
@@ -235,6 +240,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       }
     } finally {
       setState(() => _connectingApple = false);
+    }
+  }
+
+  Future<void> _importFromFile() async {
+    // TODO: Use file_picker to let user pick CSV/ICS file during onboarding
+    // final result = await FilePicker.platform.pickFiles(
+    //   type: FileType.custom,
+    //   allowedExtensions: ['csv', 'ics'],
+    // );
+    // if (result != null) {
+    //   final file = result.files.single;
+    //   final ext = file.extension ?? 'csv';
+    //   await apiService.uploadFile('/import/$ext', file.path!);
+    // }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('File import coming soon — add file_picker package')),
+      );
     }
   }
 
@@ -601,6 +624,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             onTap: onboarding.connectedAppleCalendar
                 ? null
                 : _connectAppleCalendar,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          // Import from file
+          _CalendarConnectTile(
+            icon: Icons.upload_file,
+            title: 'Import from File',
+            subtitle: 'Import CSV or ICS calendar file',
+            isConnected: false,
+            isLoading: false,
+            onTap: _importFromFile,
           ),
           const Spacer(),
           Center(

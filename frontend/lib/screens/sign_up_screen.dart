@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../theme.dart';
 
@@ -18,6 +19,7 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -29,6 +31,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -108,6 +111,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                   const SizedBox(height: AppSpacing.lg),
                 ],
+
+                // Name field
+                TextFormField(
+                  controller: _nameController,
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Name',
+                    hintText: 'Your display name',
+                    prefixIcon: Icon(Icons.person_outlined),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter your name';
+                    }
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: AppSpacing.md),
 
                 // Email field
                 TextFormField(
@@ -286,20 +309,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     try {
       final authService = AuthService.instance;
+      final displayName = _nameController.text.trim();
       final result = await authService.signUpWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text,
+        displayName: displayName,
       );
 
       if (!mounted) return;
 
       result.when(
         success: (user, session, message) {
+          // Create user profile on backend
+          if (session != null) {
+            ApiService.instance.post('/auth/register', body: {
+              'email': _emailController.text.trim(),
+              'password': _passwordController.text,
+              'display_name': displayName,
+            });
+          }
+
           if (result.needsEmailVerification) {
-            // Show email verification dialog
             _showVerificationDialog();
           } else {
-            // Navigate to home on success
             context.go('/');
           }
         },

@@ -116,13 +116,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: const Text('Switch between light and dark theme'),
             value: ref.watch(themeModeProvider) == ThemeMode.dark,
             onChanged: (value) {
-              ref.read(themeModeProvider.notifier).state =
-                  value ? ThemeMode.dark : ThemeMode.light;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Dark mode ${value ? 'enabled' : 'disabled'}'),
-                ),
-              );
+              ref.read(themeModeProvider.notifier).setThemeMode(
+                  value ? ThemeMode.dark : ThemeMode.light);
             },
           ),
           ListTile(
@@ -260,6 +255,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           // Data & Privacy
           _buildSectionHeader(context, 'Data & Privacy'),
+          ListTile(
+            leading: const Icon(Icons.upload_file),
+            title: const Text('Import calendar'),
+            subtitle: const Text('Import events from CSV or ICS file'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _importCalendar,
+          ),
           ListTile(
             leading: const Icon(Icons.key),
             title: const Text('Encryption keys'),
@@ -811,6 +813,72 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  void _importCalendar() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Import Calendar',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Import events from a CSV or ICS file',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.gray600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              ListTile(
+                leading: const Icon(Icons.table_chart),
+                title: const Text('Import CSV'),
+                subtitle: const Text('Google Calendar CSV export format'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickAndImportFile('csv');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.calendar_month),
+                title: const Text('Import ICS'),
+                subtitle: const Text('Standard iCalendar format'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickAndImportFile('ics');
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndImportFile(String format) async {
+    // TODO: Use file_picker package to select file, then upload to backend
+    // final result = await FilePicker.platform.pickFiles(
+    //   type: FileType.custom,
+    //   allowedExtensions: [format],
+    // );
+    // if (result != null) {
+    //   final file = result.files.single;
+    //   await apiService.uploadFile('/import/$format', file.path!);
+    // }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${format.toUpperCase()} import coming soon - add file_picker package'),
+      ),
+    );
+  }
+
   void _manageEncryptionKeys() {
     showModalBottomSheet(
       context: context,
@@ -898,22 +966,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _deleteAccount() {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    final authActions = ref.read(authActionsProvider);
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Account'),
         content: const Text(
           'This will permanently delete your account and all associated data. This action cannot be undone.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Implement account deletion
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              scaffoldMessenger.showSnackBar(
+                const SnackBar(content: Text('Deleting account...')),
+              );
+              final result = await authActions.deleteAccount();
+              if (result.isSuccess) {
+                router.go(AppRoutes.auth);
+              } else {
+                scaffoldMessenger.showSnackBar(
+                  SnackBar(
+                    content: Text(result.error ?? 'Failed to delete account'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
             },
             child: Text('Delete', style: TextStyle(color: AppColors.error)),
           ),
@@ -987,14 +1072,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 }
 
 /// Edit profile sheet
-class _EditProfileSheet extends StatefulWidget {
+class _EditProfileSheet extends ConsumerStatefulWidget {
   @override
-  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+  ConsumerState<_EditProfileSheet> createState() => _EditProfileSheetState();
 }
 
-class _EditProfileSheetState extends State<_EditProfileSheet> {
-  final _nameController = TextEditingController(text: 'John Doe');
-  final _emailController = TextEditingController(text: 'john@example.com');
+class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  bool _initialized = false;
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -1003,8 +1090,20 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     super.dispose();
   }
 
+  void _initFromUser() {
+    if (_initialized) return;
+    final user = ref.read(currentUserProvider).valueOrNull;
+    if (user != null) {
+      _nameController.text = user.displayName ?? '';
+      _emailController.text = user.email;
+      _initialized = true;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    _initFromUser();
+
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -1033,33 +1132,43 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
 
               // Avatar
               Center(
-                child: Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 48,
-                      backgroundColor: AppColors.gray200,
-                      child: const Icon(Icons.person, size: 48, color: AppColors.black),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.black,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.white, width: 2),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.camera_alt, color: AppColors.white, size: 16),
-                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                          padding: EdgeInsets.zero,
-                          onPressed: () {
-                            // TODO: Pick image
-                          },
+                child: SizedBox(
+                  width: 96,
+                  height: 96,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final user = ref.watch(currentUserProvider).valueOrNull;
+                          return CircleAvatar(
+                            radius: 48,
+                            backgroundColor: AppColors.gray200,
+                            backgroundImage: user?.avatarUrl != null
+                                ? NetworkImage(user!.avatarUrl!)
+                                : null,
+                            child: user?.avatarUrl == null
+                                ? const Icon(Icons.person, size: 48, color: AppColors.black)
+                                : null,
+                          );
+                        },
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: -4,
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppColors.black,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.white, width: 2),
+                          ),
+                          child: const Icon(Icons.camera_alt, color: AppColors.white, size: 14),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
 
@@ -1088,14 +1197,34 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: Save profile
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Profile updated')),
-                    );
-                  },
-                  child: const Text('Save'),
+                  onPressed: _isSaving
+                      ? null
+                      : () async {
+                          setState(() => _isSaving = true);
+                          final authActions = ref.read(authActionsProvider);
+                          final result = await authActions.updateProfile(
+                            displayName: _nameController.text.trim(),
+                          );
+                          if (mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  result.isSuccess
+                                      ? 'Profile updated'
+                                      : result.error ?? 'Update failed',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                  child: _isSaving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Save'),
                 ),
               ),
             ],

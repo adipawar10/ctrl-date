@@ -3,16 +3,21 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../theme.dart';
+import '../providers/events_provider.dart';
+import '../providers/friends_provider.dart';
 import '../widgets/priority_indicator.dart';
 import '../widgets/locked_badge.dart';
 import '../widgets/conflict_warning.dart';
 
 /// Event detail screen for viewing and editing events
-class EventDetailScreen extends StatefulWidget {
+class EventDetailScreen extends ConsumerStatefulWidget {
   final String eventId;
 
   const EventDetailScreen({
@@ -21,10 +26,10 @@ class EventDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<EventDetailScreen> createState() => _EventDetailScreenState();
+  ConsumerState<EventDetailScreen> createState() => _EventDetailScreenState();
 }
 
-class _EventDetailScreenState extends State<EventDetailScreen> {
+class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   bool _isLoading = true;
   bool _isEditing = false;
 
@@ -127,7 +132,31 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   value: 'share',
                   child: ListTile(
                     leading: Icon(Icons.share),
-                    title: Text('Share'),
+                    title: Text('Share with friend'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'invite_link',
+                  child: ListTile(
+                    leading: Icon(Icons.link),
+                    title: Text('Create invite link'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'toggle_privacy',
+                  child: ListTile(
+                    leading: Icon(
+                      _event['is_private'] == true
+                          ? Icons.lock_open
+                          : Icons.lock_outline,
+                    ),
+                    title: Text(
+                      _event['is_private'] == true
+                          ? 'Make public'
+                          : 'Make private',
+                    ),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
@@ -520,6 +549,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       case 'share':
         _shareEvent();
         break;
+      case 'invite_link':
+        _generateInviteLink();
+        break;
+      case 'toggle_privacy':
+        _togglePrivacy();
+        break;
       case 'delete':
         _deleteEvent();
         break;
@@ -602,6 +637,173 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     );
   }
 
+  void _generateInviteLink() async {
+    try {
+      final api = ref.read(apiServiceProvider);
+      final response = await api.post(
+        '/events/${widget.eventId}/invite-link',
+        body: {'max_uses': 10},
+      );
+
+      if (!response.isSuccess || response.data == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(response.error?.message ?? 'Failed to generate invite link')),
+          );
+        }
+        return;
+      }
+
+      final data = response.data as Map<String, dynamic>;
+      final token = data['token'] as String?;
+      if (token == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to generate invite link')),
+          );
+        }
+        return;
+      }
+
+      final link = 'ctrlshiftdate://invite/$token';
+
+      if (!mounted) return;
+      showModalBottomSheet(
+        context: context,
+        builder: (context) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Invite Link',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Share this link to invite others to this event:',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.gray600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          link,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.copy),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: link));
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Link copied to clipboard')),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Revoke Link'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                    ),
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      try {
+                        await api.delete(
+                          '/events/${widget.eventId}/invite-link',
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Invite link revoked')),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to revoke: $e')),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to generate link: $e')),
+        );
+      }
+    }
+  }
+
+  void _togglePrivacy() async {
+    final currentlyPrivate = _event['is_private'] == true;
+    final newValue = !currentlyPrivate;
+
+    try {
+      final api = ref.read(apiServiceProvider);
+      final response = await api.put(
+        '/events/${widget.eventId}',
+        body: {'is_private': newValue},
+      );
+
+      if (!response.isSuccess) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(response.error?.message ?? 'Failed to update privacy')),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _event['is_private'] = newValue;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              newValue ? 'Event is now private' : 'Event is now visible to friends',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update privacy: $e')),
+        );
+      }
+    }
+  }
+
   void _duplicateEvent() {
     // TODO: Implement duplicate
     ScaffoldMessenger.of(context).showSnackBar(
@@ -610,9 +812,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   void _shareEvent() {
-    // TODO: Implement share
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Share coming soon')),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _ShareEventSheet(
+        eventId: widget.eventId,
+        eventTitle: _event['title'],
+      ),
     );
   }
 
@@ -628,12 +834,25 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              context.pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Event deleted')),
-              );
+              try {
+                await ref
+                    .read(eventActionsProvider)
+                    .delete(widget.eventId);
+                if (mounted) {
+                  context.pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Event deleted')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to delete: $e')),
+                  );
+                }
+              }
             },
             child: Text(
               'Delete',
@@ -643,5 +862,165 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         ],
       ),
     );
+  }
+}
+
+/// Bottom sheet for sharing an event with friends
+class _ShareEventSheet extends ConsumerStatefulWidget {
+  final String eventId;
+  final String eventTitle;
+
+  const _ShareEventSheet({
+    required this.eventId,
+    required this.eventTitle,
+  });
+
+  @override
+  ConsumerState<_ShareEventSheet> createState() => _ShareEventSheetState();
+}
+
+class _ShareEventSheetState extends ConsumerState<_ShareEventSheet> {
+  String _selectedPermission = 'view';
+  bool _isSending = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final friendsAsync = ref.watch(friendsProvider);
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: AppSpacing.md,
+          right: AppSpacing.md,
+          top: AppSpacing.md,
+          bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.md,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Share Event',
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              widget.eventTitle,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.gray600,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            // Permission selector
+            Text('Permission', style: theme.textTheme.labelLarge),
+            const SizedBox(height: AppSpacing.xs),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'view', label: Text('View')),
+                ButtonSegment(value: 'edit', label: Text('Edit')),
+                ButtonSegment(value: 'admin', label: Text('Admin')),
+              ],
+              selected: {_selectedPermission},
+              onSelectionChanged: (selection) {
+                setState(() => _selectedPermission = selection.first);
+              },
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text('Share with', style: theme.textTheme.labelLarge),
+            const SizedBox(height: AppSpacing.sm),
+            // Friends list
+            friendsAsync.when(
+              data: (friends) {
+                if (friends.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.all(AppSpacing.lg),
+                    child: Center(
+                      child: Text('No friends yet. Add friends to share events.'),
+                    ),
+                  );
+                }
+                return ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.3,
+                  ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: friends.length,
+                    itemBuilder: (context, index) {
+                      final friend = friends[index];
+                      final profile = friend.addresseeProfile ??
+                          friend.requesterProfile;
+                      final displayName =
+                          profile?.displayName ?? 'Unknown';
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          child: Text(
+                            displayName.isNotEmpty
+                                ? displayName[0].toUpperCase()
+                                : '?',
+                          ),
+                        ),
+                        title: Text(displayName),
+                        trailing: _isSending
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : IconButton(
+                                icon: const Icon(Icons.send),
+                                onPressed: () => _shareWithFriend(
+                                  friend.getFriendId(
+                                    Supabase.instance.client.auth.currentUser?.id ?? '',
+                                  ),
+                                  displayName,
+                                ),
+                              ),
+                      );
+                    },
+                  ),
+                );
+              },
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error loading friends: $e')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _shareWithFriend(String friendUserId, String name) async {
+    setState(() => _isSending = true);
+
+    try {
+      final api = ref.read(apiServiceProvider);
+      final response = await api.post(
+        '/sharing/events/${widget.eventId}/share',
+        body: {
+          'user_id': friendUserId,
+          'permission': _selectedPermission,
+        },
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Event shared with $name')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to share: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
   }
 }

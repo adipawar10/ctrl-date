@@ -13,6 +13,10 @@ enum EventStatus {
   inProgress,
   @JsonValue('completed')
   completed,
+  @JsonValue('partial')
+  partial,
+  @JsonValue('skipped')
+  skipped,
   @JsonValue('cancelled')
   cancelled,
 }

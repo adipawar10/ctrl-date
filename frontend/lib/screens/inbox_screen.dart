@@ -3,134 +3,32 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../models/inbox.dart';
+import '../providers/inbox_provider.dart';
+import '../providers/friends_provider.dart';
 import '../theme.dart';
 import '../widgets/message_bubble.dart';
 
 /// Inbox screen showing encrypted messages, friends, and system notifications
-class InboxScreen extends StatefulWidget {
+class InboxScreen extends ConsumerStatefulWidget {
   const InboxScreen({super.key});
 
   @override
-  State<InboxScreen> createState() => _InboxScreenState();
+  ConsumerState<InboxScreen> createState() => _InboxScreenState();
 }
 
-class _InboxScreenState extends State<InboxScreen>
+class _InboxScreenState extends ConsumerState<InboxScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  bool _isLoading = false;
-
-  // Mock data - replace with actual state management
-  final List<Map<String, dynamic>> _messages = [
-    {
-      'id': '1',
-      'sender_id': '2',
-      'sender_name': 'Alice Johnson',
-      'message_type': 'text',
-      'preview': 'Hey! Are we still meeting tomorrow?',
-      'is_read': false,
-      'created_at': DateTime.now().subtract(const Duration(minutes: 15)),
-    },
-    {
-      'id': '2',
-      'sender_id': '3',
-      'sender_name': 'Bob Smith',
-      'message_type': 'event_share',
-      'preview': 'Shared: Team Lunch',
-      'is_read': false,
-      'created_at': DateTime.now().subtract(const Duration(hours: 2)),
-    },
-    {
-      'id': '3',
-      'sender_id': '4',
-      'sender_name': 'Charlie Brown',
-      'message_type': 'poke',
-      'preview': 'Poked you!',
-      'is_read': true,
-      'created_at': DateTime.now().subtract(const Duration(days: 1)),
-    },
-  ];
-
-  final List<Map<String, dynamic>> _friends = [
-    {
-      'id': '2',
-      'name': 'Alice Johnson',
-      'email': 'alice@example.com',
-      'status': 'online',
-      'last_seen': DateTime.now(),
-    },
-    {
-      'id': '3',
-      'name': 'Bob Smith',
-      'email': 'bob@example.com',
-      'status': 'offline',
-      'last_seen': DateTime.now().subtract(const Duration(hours: 3)),
-    },
-    {
-      'id': '4',
-      'name': 'Charlie Brown',
-      'email': 'charlie@example.com',
-      'status': 'offline',
-      'last_seen': DateTime.now().subtract(const Duration(days: 2)),
-    },
-    {
-      'id': '5',
-      'name': 'Diana Prince',
-      'email': 'diana@example.com',
-      'status': 'online',
-      'last_seen': DateTime.now(),
-    },
-  ];
-
-  final List<Map<String, dynamic>> _systemNotifications = [
-    {
-      'id': 'n1',
-      'type': 'friend_request',
-      'title': 'Friend Request',
-      'body': 'Emma Watson wants to be your friend',
-      'is_read': false,
-      'created_at': DateTime.now().subtract(const Duration(hours: 1)),
-      'data': {'user_id': '6', 'user_name': 'Emma Watson'},
-    },
-    {
-      'id': 'n2',
-      'type': 'shared_event',
-      'title': 'Shared Event',
-      'body': 'Alice shared "Project Review" with you',
-      'is_read': false,
-      'created_at': DateTime.now().subtract(const Duration(hours: 3)),
-      'data': {'event_id': 'e1', 'event_title': 'Project Review'},
-    },
-    {
-      'id': 'n3',
-      'type': 'friend_request',
-      'title': 'Friend Request Accepted',
-      'body': 'Bob Smith accepted your friend request',
-      'is_read': true,
-      'created_at': DateTime.now().subtract(const Duration(days: 1)),
-      'data': {'user_id': '3', 'user_name': 'Bob Smith'},
-    },
-    {
-      'id': 'n4',
-      'type': 'shared_event',
-      'title': 'Event Updated',
-      'body': 'Charlie updated "Team Lunch" - time changed',
-      'is_read': true,
-      'created_at': DateTime.now().subtract(const Duration(days: 2)),
-      'data': {'event_id': 'e2', 'event_title': 'Team Lunch'},
-    },
-  ];
-
-  int get _unreadMessageCount => _messages.where((m) => !m['is_read']).length;
-  int get _unreadSystemCount =>
-      _systemNotifications.where((n) => !n['is_read']).length;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
@@ -142,13 +40,15 @@ class _InboxScreenState extends State<InboxScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final inboxState = ref.watch(inboxProvider);
+    final unreadCount = ref.watch(unreadMessageCountProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Inbox'),
         actions: [
           PopupMenuButton<String>(
-            onSelected: _handleMenuAction,
+            onSelected: (action) => _handleMenuAction(action, ref),
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: 'mark_all_read',
@@ -169,35 +69,22 @@ class _InboxScreenState extends State<InboxScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text('Messages'),
-                  if (_unreadMessageCount > 0) ...[
+                  if (unreadCount > 0) ...[
                     const SizedBox(width: 4),
-                    _buildBadge('$_unreadMessageCount'),
+                    _buildBadge('$unreadCount'),
                   ],
                 ],
               ),
             ),
-            const Tab(text: 'Friends'),
-            Tab(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('System'),
-                  if (_unreadSystemCount > 0) ...[
-                    const SizedBox(width: 4),
-                    _buildBadge('$_unreadSystemCount'),
-                  ],
-                ],
-              ),
-            ),
+            const Tab(text: 'Notifications'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildMessagesList(context),
-          _buildFriendsList(context),
-          _buildSystemList(context),
+          _buildMessagesList(context, inboxState),
+          _buildNotificationsList(context, inboxState),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -226,10 +113,17 @@ class _InboxScreenState extends State<InboxScreen>
     );
   }
 
-  Widget _buildMessagesList(BuildContext context) {
+  Widget _buildMessagesList(BuildContext context, InboxState inboxState) {
     final theme = Theme.of(context);
+    final messages = inboxState.messages
+        .where((m) => m.type == MessageType.poke || m.type == MessageType.eventShare || m.type == MessageType.friendRequest || m.type == MessageType.friendAccepted)
+        .toList();
 
-    if (_messages.isEmpty) {
+    if (inboxState.isLoading && messages.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (messages.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -257,156 +151,44 @@ class _InboxScreenState extends State<InboxScreen>
     }
 
     return RefreshIndicator(
-      onRefresh: _refreshMessages,
+      onRefresh: () => ref.read(inboxActionsProvider).refresh(),
       child: ListView.builder(
-        itemCount: _messages.length,
+        itemCount: messages.length,
         itemBuilder: (context, index) {
-          final message = _messages[index];
+          final message = messages[index];
           return MessageBubble(
-            id: message['id'],
-            senderName: message['sender_name'],
-            messageType: message['message_type'],
-            preview: message['preview'],
-            isRead: message['is_read'],
-            createdAt: message['created_at'],
+            id: message.id,
+            senderName: message.sender?.displayName ?? 'Unknown',
+            messageType: message.type.name,
+            preview: message.body ?? message.title,
+            isRead: message.isRead,
+            createdAt: message.createdAt ?? DateTime.now(),
             onTap: () => _openMessage(message),
-            onDismiss: () => _deleteMessage(message['id']),
+            onDismiss: () => _deleteMessage(message.id),
           );
         },
       ),
     );
   }
 
-  Widget _buildFriendsList(BuildContext context) {
+  Widget _buildNotificationsList(BuildContext context, InboxState inboxState) {
     final theme = Theme.of(context);
+    final notifications = inboxState.messages
+        .where((m) =>
+            m.type == MessageType.system ||
+            m.type == MessageType.announcement ||
+            m.type == MessageType.eventReminder ||
+            m.type == MessageType.eventUpdate ||
+            m.type == MessageType.eventCancelled ||
+            m.type == MessageType.reflectionReminder ||
+            m.type == MessageType.streakMilestone)
+        .toList();
 
-    if (_friends.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.people_outline,
-              size: 64,
-              color: theme.colorScheme.outline,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'No friends yet',
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Add friends to start collaborating',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.gray600,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            OutlinedButton.icon(
-              onPressed: _addFriend,
-              icon: const Icon(Icons.person_add),
-              label: const Text('Add Friend'),
-            ),
-          ],
-        ),
-      );
+    if (inboxState.isLoading && notifications.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
     }
 
-    return RefreshIndicator(
-      onRefresh: _refreshFriends,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-        itemCount: _friends.length + 1, // +1 for add friend button
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              child: OutlinedButton.icon(
-                onPressed: _addFriend,
-                icon: const Icon(Icons.person_add),
-                label: const Text('Add Friend'),
-              ),
-            );
-          }
-          final friend = _friends[index - 1];
-          return _buildFriendTile(friend);
-        },
-      ),
-    );
-  }
-
-  Widget _buildFriendTile(Map<String, dynamic> friend) {
-    final theme = Theme.of(context);
-    final isOnline = friend['status'] == 'online';
-
-    return ListTile(
-      leading: Stack(
-        children: [
-          CircleAvatar(
-            backgroundColor: AppColors.gray200,
-            child: Text(
-              friend['name'][0].toUpperCase(),
-              style: const TextStyle(
-                color: AppColors.black,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: isOnline ? AppColors.success : AppColors.gray400,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.white, width: 2),
-              ),
-            ),
-          ),
-        ],
-      ),
-      title: Text(
-        friend['name'],
-        style: theme.textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: AppColors.black,
-        ),
-      ),
-      subtitle: Text(
-        isOnline ? 'Online' : 'Last seen ${_formatLastSeen(friend['last_seen'])}',
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: isOnline ? AppColors.success : AppColors.gray500,
-        ),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.message_outlined),
-            onPressed: () => _startConversation(friend),
-            tooltip: 'Send message',
-          ),
-          IconButton(
-            icon: const Icon(Icons.calendar_today_outlined),
-            onPressed: () => _shareEvent(friend),
-            tooltip: 'Share event',
-          ),
-        ],
-      ),
-      onTap: () => _showFriendOptions(friend),
-    );
-  }
-
-  Widget _buildSystemList(BuildContext context) {
-    final theme = Theme.of(context);
-
-    if (_systemNotifications.isEmpty) {
+    if (notifications.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -434,37 +216,40 @@ class _InboxScreenState extends State<InboxScreen>
     }
 
     return RefreshIndicator(
-      onRefresh: _refreshNotifications,
+      onRefresh: () => ref.read(inboxActionsProvider).refresh(),
       child: ListView.builder(
-        itemCount: _systemNotifications.length,
+        itemCount: notifications.length,
         itemBuilder: (context, index) {
-          final notification = _systemNotifications[index];
-          return _buildSystemNotificationTile(notification);
+          final notification = notifications[index];
+          return _buildNotificationTile(notification);
         },
       ),
     );
   }
 
-  Widget _buildSystemNotificationTile(Map<String, dynamic> notification) {
+  Widget _buildNotificationTile(InboxMessage notification) {
     final theme = Theme.of(context);
-    final isRead = notification['is_read'] as bool;
-    final type = notification['type'] as String;
 
     IconData icon;
-    switch (type) {
-      case 'friend_request':
+    switch (notification.type) {
+      case MessageType.friendRequest:
+      case MessageType.friendAccepted:
         icon = Icons.person_add;
         break;
-      case 'shared_event':
+      case MessageType.eventShare:
+      case MessageType.eventUpdate:
+      case MessageType.eventReminder:
         icon = Icons.event_available;
+        break;
+      case MessageType.streakMilestone:
+        icon = Icons.local_fire_department;
         break;
       default:
         icon = Icons.notifications;
     }
 
-    // System notifications have a distinct gray styling
     return Dismissible(
-      key: Key(notification['id']),
+      key: Key(notification.id),
       background: Container(
         color: AppColors.error,
         alignment: Alignment.centerRight,
@@ -472,9 +257,9 @@ class _InboxScreenState extends State<InboxScreen>
         child: const Icon(Icons.delete, color: AppColors.white),
       ),
       direction: DismissDirection.endToStart,
-      onDismissed: (_) => _deleteSystemNotification(notification['id']),
+      onDismissed: (_) => _deleteMessage(notification.id),
       child: Container(
-        color: isRead ? AppColors.white : AppColors.gray100,
+        color: notification.isRead ? AppColors.white : AppColors.gray100,
         child: ListTile(
           leading: Container(
             width: 40,
@@ -486,14 +271,14 @@ class _InboxScreenState extends State<InboxScreen>
             child: Icon(icon, size: 20, color: AppColors.gray600),
           ),
           title: Text(
-            notification['title'],
+            notification.title,
             style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: isRead ? FontWeight.w500 : FontWeight.w600,
+              fontWeight: notification.isRead ? FontWeight.w500 : FontWeight.w600,
               color: AppColors.gray700,
             ),
           ),
           subtitle: Text(
-            notification['body'],
+            notification.body ?? '',
             style: theme.textTheme.bodySmall?.copyWith(
               color: AppColors.gray500,
             ),
@@ -505,12 +290,12 @@ class _InboxScreenState extends State<InboxScreen>
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                _formatTime(notification['created_at']),
+                _formatTime(notification.createdAt ?? DateTime.now()),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: AppColors.gray500,
                 ),
               ),
-              if (!isRead) ...[
+              if (!notification.isRead) ...[
                 const SizedBox(height: 4),
                 Container(
                   width: 8,
@@ -523,7 +308,9 @@ class _InboxScreenState extends State<InboxScreen>
               ],
             ],
           ),
-          onTap: () => _openSystemNotification(notification),
+          onTap: () {
+            ref.read(inboxActionsProvider).markAsRead(notification.id);
+          },
         ),
       ),
     );
@@ -544,32 +331,10 @@ class _InboxScreenState extends State<InboxScreen>
     }
   }
 
-  String _formatLastSeen(DateTime time) {
-    final now = DateTime.now();
-    final diff = now.difference(time);
-
-    if (diff.inMinutes < 60) {
-      return '${diff.inMinutes}m ago';
-    } else if (diff.inHours < 24) {
-      return '${diff.inHours}h ago';
-    } else if (diff.inDays < 7) {
-      return '${diff.inDays}d ago';
-    } else {
-      return DateFormat('MMM d').format(time);
-    }
-  }
-
-  void _handleMenuAction(String action) {
+  void _handleMenuAction(String action, WidgetRef ref) {
     switch (action) {
       case 'mark_all_read':
-        setState(() {
-          for (final m in _messages) {
-            m['is_read'] = true;
-          }
-          for (final n in _systemNotifications) {
-            n['is_read'] = true;
-          }
-        });
+        ref.read(inboxActionsProvider).markAllAsRead();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('All marked as read')),
         );
@@ -590,10 +355,9 @@ class _InboxScreenState extends State<InboxScreen>
               TextButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  setState(() {
-                    _messages.clear();
-                    _systemNotifications.clear();
-                  });
+                  final inboxState = ref.read(inboxProvider);
+                  final allIds = inboxState.messages.map((m) => m.id).toList();
+                  ref.read(inboxActionsProvider).deleteMultiple(allIds);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('All cleared')),
                   );
@@ -608,40 +372,25 @@ class _InboxScreenState extends State<InboxScreen>
   }
 
   void _composeMessage() {
+    final friendships = ref.read(friendshipsProvider).valueOrNull ?? [];
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _ComposeMessageSheet(friends: _friends),
+      builder: (context) => _ComposeMessageSheet(
+        friends: friendships.where((f) => f.isActive).map((f) {
+          // We don't have current user ID here, so use both profiles
+          final profile = f.requester ?? f.addressee;
+          return {
+            'id': f.requesterId,
+            'name': profile?.displayName ?? 'Friend',
+          };
+        }).toList(),
+      ),
     );
   }
 
-  void _addFriend() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _AddFriendSheet(),
-    );
-  }
-
-  Future<void> _refreshMessages() async {
-    // TODO: Implement actual API call
-    await Future.delayed(const Duration(seconds: 1));
-  }
-
-  Future<void> _refreshFriends() async {
-    // TODO: Implement actual API call
-    await Future.delayed(const Duration(seconds: 1));
-  }
-
-  Future<void> _refreshNotifications() async {
-    // TODO: Implement actual API call
-    await Future.delayed(const Duration(seconds: 1));
-  }
-
-  void _openMessage(Map<String, dynamic> message) {
-    setState(() {
-      message['is_read'] = true;
-    });
+  void _openMessage(InboxMessage message) {
+    ref.read(inboxActionsProvider).markAsRead(message.id);
 
     showModalBottomSheet(
       context: context,
@@ -650,164 +399,10 @@ class _InboxScreenState extends State<InboxScreen>
     );
   }
 
-  void _openSystemNotification(Map<String, dynamic> notification) {
-    setState(() {
-      notification['is_read'] = true;
-    });
-
-    final type = notification['type'] as String;
-    final data = notification['data'] as Map<String, dynamic>;
-
-    if (type == 'friend_request' && notification['title'] == 'Friend Request') {
-      _showFriendRequestDialog(data);
-    } else if (type == 'shared_event') {
-      // TODO: Navigate to event details
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Opening event: ${data['event_title']}')),
-      );
-    }
-  }
-
-  void _showFriendRequestDialog(Map<String, dynamic> data) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Friend Request'),
-        content: Text('${data['user_name']} wants to be your friend.'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Friend request declined')),
-              );
-            },
-            child: const Text('Decline'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${data['user_name']} added as friend')),
-              );
-            },
-            child: const Text('Accept'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _deleteMessage(String id) {
-    setState(() {
-      _messages.removeWhere((m) => m['id'] == id);
-    });
+    ref.read(inboxActionsProvider).delete(id);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Message deleted')),
-    );
-  }
-
-  void _deleteSystemNotification(String id) {
-    setState(() {
-      _systemNotifications.removeWhere((n) => n['id'] == id);
-    });
-  }
-
-  void _startConversation(Map<String, dynamic> friend) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _ComposeMessageSheet(
-        friends: _friends,
-        preselectedFriendId: friend['id'],
-      ),
-    );
-  }
-
-  void _shareEvent(Map<String, dynamic> friend) {
-    // TODO: Implement event sharing
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Share event with ${friend['name']}')),
-    );
-  }
-
-  void _showFriendOptions(Map<String, dynamic> friend) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: CircleAvatar(
-                backgroundColor: AppColors.gray200,
-                child: Text(
-                  friend['name'][0].toUpperCase(),
-                  style: const TextStyle(
-                    color: AppColors.black,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              title: Text(friend['name']),
-              subtitle: Text(friend['email']),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.message_outlined),
-              title: const Text('Send message'),
-              onTap: () {
-                Navigator.pop(context);
-                _startConversation(friend);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.calendar_today_outlined),
-              title: const Text('Share event'),
-              onTap: () {
-                Navigator.pop(context);
-                _shareEvent(friend);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.person_remove, color: AppColors.error),
-              title: Text('Remove friend', style: TextStyle(color: AppColors.error)),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmRemoveFriend(friend);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _confirmRemoveFriend(Map<String, dynamic> friend) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove Friend'),
-        content: Text('Are you sure you want to remove ${friend['name']} from your friends?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _friends.removeWhere((f) => f['id'] == friend['id']);
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${friend['name']} removed from friends')),
-              );
-            },
-            child: Text('Remove', style: TextStyle(color: AppColors.error)),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -945,111 +540,17 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet> {
   }
 
   void _sendMessage() {
-    // TODO: Implement E2E encryption and send
+    // TODO: Implement E2E encryption via backend /inbox POST
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Message sent')),
+      const SnackBar(content: Text('Message sent (encrypted)')),
     );
-  }
-}
-
-/// Add friend sheet
-class _AddFriendSheet extends StatefulWidget {
-  @override
-  State<_AddFriendSheet> createState() => _AddFriendSheetState();
-}
-
-class _AddFriendSheetState extends State<_AddFriendSheet> {
-  final _emailController = TextEditingController();
-  bool _isSearching = false;
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Add Friend',
-                    style: theme.textTheme.titleLarge,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email address',
-                  hintText: 'Enter friend\'s email',
-                  prefixIcon: Icon(Icons.email_outlined),
-                ),
-                keyboardType: TextInputType.emailAddress,
-              ),
-
-              const SizedBox(height: AppSpacing.md),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _emailController.text.isNotEmpty ? _sendFriendRequest : null,
-                  icon: _isSearching
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.white,
-                          ),
-                        )
-                      : const Icon(Icons.person_add),
-                  label: Text(_isSearching ? 'Sending...' : 'Send Friend Request'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _sendFriendRequest() {
-    setState(() => _isSearching = true);
-    // TODO: Implement friend request
-    Future.delayed(const Duration(seconds: 1), () {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Friend request sent')),
-      );
-    });
   }
 }
 
 /// Message detail sheet
 class _MessageDetailSheet extends StatelessWidget {
-  final Map<String, dynamic> message;
+  final InboxMessage message;
 
   const _MessageDetailSheet({required this.message});
 
@@ -1069,7 +570,7 @@ class _MessageDetailSheet extends StatelessWidget {
                 CircleAvatar(
                   backgroundColor: AppColors.gray200,
                   child: Text(
-                    message['sender_name'][0].toUpperCase(),
+                    (message.sender?.displayName ?? 'U')[0].toUpperCase(),
                     style: const TextStyle(
                       color: AppColors.black,
                       fontWeight: FontWeight.w600,
@@ -1082,13 +583,14 @@ class _MessageDetailSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        message['sender_name'],
+                        message.sender?.displayName ?? 'Unknown',
                         style: theme.textTheme.titleMedium,
                       ),
-                      Text(
-                        DateFormat('MMM d, HH:mm').format(message['created_at']),
-                        style: theme.textTheme.bodySmall,
-                      ),
+                      if (message.createdAt != null)
+                        Text(
+                          DateFormat('MMM d, HH:mm').format(message.createdAt!),
+                          style: theme.textTheme.bodySmall,
+                        ),
                     ],
                   ),
                 ),
@@ -1104,24 +606,48 @@ class _MessageDetailSheet extends StatelessWidget {
 
             // Message content
             Text(
-              message['preview'],
-              style: theme.textTheme.bodyLarge,
-            ),
-
-            const SizedBox(height: AppSpacing.lg),
-
-            // Reply button
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  // TODO: Open reply composer
-                },
-                icon: const Icon(Icons.reply),
-                label: const Text('Reply'),
+              message.title,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
               ),
             ),
+            if (message.body != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                message.body!,
+                style: theme.textTheme.bodyLarge,
+              ),
+            ],
+
+            // Actions
+            if (message.actions != null && message.actions!.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.lg),
+              ...message.actions!.map((action) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: action.isPrimary
+                      ? ElevatedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(action.label),
+                        )
+                      : OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(action.label),
+                        ),
+                ),
+              )),
+            ] else ...[
+              const SizedBox(height: AppSpacing.lg),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.reply),
+                  label: const Text('Reply'),
+                ),
+              ),
+            ],
           ],
         ),
       ),

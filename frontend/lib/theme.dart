@@ -797,103 +797,71 @@ class AppTheme {
           behavior: SnackBarBehavior.floating,
         ),
 
-        // Text theme with white colors - use inherit: true for smooth transitions
-        textTheme: const TextTheme(
-          displayLarge: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 32,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.5,
-            color: AppColors.white,
+        // Dialog
+        dialogTheme: DialogThemeData(
+          backgroundColor: AppColors.gray900,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
-          displayMedium: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 28,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.25,
-            color: AppColors.white,
+          titleTextStyle: AppTypography.titleLarge.copyWith(color: AppColors.white),
+          contentTextStyle: AppTypography.bodyMedium.copyWith(color: AppColors.gray300),
+        ),
+
+        // Chip
+        chipTheme: ChipThemeData(
+          backgroundColor: AppColors.gray800,
+          labelStyle: AppTypography.labelMedium.copyWith(color: AppColors.white),
+          side: const BorderSide(color: AppColors.gray700),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
-          displaySmall: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-            color: AppColors.white,
+        ),
+
+        // Bottom sheet
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: AppColors.gray900,
+          surfaceTintColor: Colors.transparent,
+        ),
+
+        // Tab bar
+        tabBarTheme: TabBarThemeData(
+          labelColor: AppColors.white,
+          unselectedLabelColor: AppColors.gray500,
+          labelStyle: AppTypography.labelLarge.copyWith(color: AppColors.white),
+          unselectedLabelStyle: AppTypography.labelLarge.copyWith(color: AppColors.gray500),
+          indicator: const UnderlineTabIndicator(
+            borderSide: BorderSide(color: AppColors.white, width: 2),
           ),
-          headlineLarge: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            color: AppColors.white,
+          indicatorSize: TabBarIndicatorSize.label,
+        ),
+
+        // Tooltip
+        tooltipTheme: TooltipThemeData(
+          decoration: BoxDecoration(
+            color: AppColors.gray200,
+            borderRadius: BorderRadius.circular(AppRadius.xs),
           ),
-          headlineMedium: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
-            color: AppColors.white,
-          ),
-          headlineSmall: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: AppColors.white,
-          ),
-          titleLarge: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppColors.white,
-          ),
-          titleMedium: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.white,
-          ),
-          titleSmall: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.gray400,
-          ),
-          bodyLarge: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 16,
-            fontWeight: FontWeight.w400,
-            color: AppColors.gray300,
-          ),
-          bodyMedium: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-            color: AppColors.gray300,
-          ),
-          bodySmall: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 12,
-            fontWeight: FontWeight.w400,
-            color: AppColors.gray400,
-          ),
-          labelLarge: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.1,
-            color: AppColors.white,
-          ),
-          labelMedium: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.5,
-            color: AppColors.gray400,
-          ),
-          labelSmall: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.5,
-            color: AppColors.gray400,
-          ),
+          textStyle: AppTypography.bodySmall.copyWith(color: AppColors.black),
+        ),
+
+        // Text theme - reuse AppTypography with dark mode colors
+        textTheme: TextTheme(
+          displayLarge: AppTypography.displayLarge.copyWith(color: AppColors.white),
+          displayMedium: AppTypography.displayMedium.copyWith(color: AppColors.white),
+          displaySmall: AppTypography.displaySmall.copyWith(color: AppColors.white),
+          headlineLarge: AppTypography.headlineLarge.copyWith(color: AppColors.white),
+          headlineMedium: AppTypography.headlineMedium.copyWith(color: AppColors.white),
+          headlineSmall: AppTypography.headlineSmall.copyWith(color: AppColors.white),
+          titleLarge: AppTypography.titleLarge.copyWith(color: AppColors.white),
+          titleMedium: AppTypography.titleMedium.copyWith(color: AppColors.white),
+          titleSmall: AppTypography.titleSmall.copyWith(color: AppColors.gray400),
+          bodyLarge: AppTypography.bodyLarge.copyWith(color: AppColors.gray300),
+          bodyMedium: AppTypography.bodyMedium.copyWith(color: AppColors.gray300),
+          bodySmall: AppTypography.bodySmall.copyWith(color: AppColors.gray400),
+          labelLarge: AppTypography.labelLarge.copyWith(color: AppColors.white),
+          labelMedium: AppTypography.labelMedium.copyWith(color: AppColors.gray400),
+          labelSmall: AppTypography.labelSmall.copyWith(color: AppColors.gray400),
         ),
       );
 }

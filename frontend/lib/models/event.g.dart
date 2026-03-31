@@ -88,6 +88,8 @@ const _$EventStatusEnumMap = {
   EventStatus.scheduled: 'scheduled',
   EventStatus.inProgress: 'in_progress',
   EventStatus.completed: 'completed',
+  EventStatus.partial: 'partial',
+  EventStatus.skipped: 'skipped',
   EventStatus.cancelled: 'cancelled',
 };
 

@@ -38,12 +38,39 @@ async def list_friends(
     response1 = query1.execute()
     response2 = query2.execute()
 
+    # Collect all friend user IDs to batch-fetch streaks
+    friend_user_ids = set()
+    for f in response1.data or []:
+        friend_data = f.get("users")
+        if friend_data:
+            friend_user_ids.add(friend_data["id"])
+    for f in response2.data or []:
+        friend_data = f.get("users")
+        if friend_data:
+            friend_user_ids.add(friend_data["id"])
+
+    # Fetch streak data for all friends in one query
+    streaks_by_user = {}
+    if friend_user_ids:
+        streaks_response = supabase.table("streaks").select(
+            "user_id, streak_type, current_count, longest_count"
+        ).in_("user_id", list(friend_user_ids)).eq(
+            "streak_type", "daily_completion"
+        ).execute()
+
+        for s in streaks_response.data or []:
+            streaks_by_user[s["user_id"]] = {
+                "current_count": s.get("current_count", 0),
+                "longest_count": s.get("longest_count", 0),
+            }
+
     friends = []
 
     # Process friendships where user is requester
     for f in response1.data or []:
         friend_data = f.get("users")
         if friend_data:
+            streak = streaks_by_user.get(friend_data["id"], {})
             friends.append({
                 "friendship_id": f["id"],
                 "user_id": friend_data["id"],
@@ -54,12 +81,15 @@ async def list_friends(
                 "is_requester": True,
                 "created_at": f["created_at"],
                 "accepted_at": f.get("accepted_at"),
+                "streak_count": streak.get("current_count", 0),
+                "longest_streak": streak.get("longest_count", 0),
             })
 
     # Process friendships where user is addressee
     for f in response2.data or []:
         friend_data = f.get("users")
         if friend_data:
+            streak = streaks_by_user.get(friend_data["id"], {})
             friends.append({
                 "friendship_id": f["id"],
                 "user_id": friend_data["id"],
@@ -70,6 +100,8 @@ async def list_friends(
                 "is_requester": False,
                 "created_at": f["created_at"],
                 "accepted_at": f.get("accepted_at"),
+                "streak_count": streak.get("current_count", 0),
+                "longest_streak": streak.get("longest_count", 0),
             })
 
     return {"friends": friends}

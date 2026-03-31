@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/event.dart';
@@ -42,7 +43,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
   bool _allDay = false;
   bool _isLocked = false;
   int _priority = 2;
-  String? _recurrence;
+  RecurrenceRule? _recurrenceRule;
   List<String> _tags = [];
 
   // Conflict detection
@@ -183,7 +184,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    _recurrence ?? 'Never',
+                    _recurrenceRule?.description ?? 'Never',
                     style: theme.textTheme.bodyLarge,
                   ),
                   const SizedBox(width: AppSpacing.xs),
@@ -341,41 +342,65 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
             const SizedBox(height: AppSpacing.md),
             ListTile(
               title: const Text('Never'),
-              trailing: _recurrence == null ? const Icon(Icons.check) : null,
+              trailing: _recurrenceRule == null ? const Icon(Icons.check) : null,
               onTap: () {
-                setState(() => _recurrence = null);
+                setState(() => _recurrenceRule = null);
                 Navigator.pop(context);
               },
             ),
             ListTile(
               title: const Text('Daily'),
-              trailing: _recurrence == 'Daily' ? const Icon(Icons.check) : null,
+              trailing: _recurrenceRule?.frequency == RecurrenceFrequency.daily &&
+                      _recurrenceRule?.interval == 1
+                  ? const Icon(Icons.check)
+                  : null,
               onTap: () {
-                setState(() => _recurrence = 'Daily');
+                setState(() => _recurrenceRule = const RecurrenceRule(
+                  frequency: RecurrenceFrequency.daily,
+                ));
                 Navigator.pop(context);
               },
             ),
             ListTile(
               title: const Text('Weekly'),
-              trailing: _recurrence == 'Weekly' ? const Icon(Icons.check) : null,
+              trailing: _recurrenceRule?.frequency == RecurrenceFrequency.weekly &&
+                      _recurrenceRule?.interval == 1
+                  ? const Icon(Icons.check)
+                  : null,
               onTap: () {
-                setState(() => _recurrence = 'Weekly');
+                setState(() => _recurrenceRule = RecurrenceRule(
+                  frequency: RecurrenceFrequency.weekly,
+                  byWeekDay: [_startDate.weekday - 1], // 0-based Monday
+                ));
                 Navigator.pop(context);
               },
             ),
             ListTile(
               title: const Text('Monthly'),
-              trailing: _recurrence == 'Monthly' ? const Icon(Icons.check) : null,
+              trailing: _recurrenceRule?.frequency == RecurrenceFrequency.monthly &&
+                      _recurrenceRule?.interval == 1
+                  ? const Icon(Icons.check)
+                  : null,
               onTap: () {
-                setState(() => _recurrence = 'Monthly');
+                setState(() => _recurrenceRule = RecurrenceRule(
+                  frequency: RecurrenceFrequency.monthly,
+                  byMonthDay: [_startDate.day],
+                ));
                 Navigator.pop(context);
               },
             ),
             ListTile(
               title: const Text('Yearly'),
-              trailing: _recurrence == 'Yearly' ? const Icon(Icons.check) : null,
+              trailing: _recurrenceRule?.frequency == RecurrenceFrequency.yearly &&
+                      _recurrenceRule?.interval == 1
+                  ? const Icon(Icons.check)
+                  : null,
               onTap: () {
-                setState(() => _recurrence = 'Yearly');
+                setState(() => _recurrenceRule = RecurrenceRule(
+                  frequency: RecurrenceFrequency.yearly,
+                  byMonth: [_startDate.month],
+                  byMonthDay: [_startDate.day],
+                ));
                 Navigator.pop(context);
               },
             ),
@@ -384,12 +409,200 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: Show custom recurrence dialog
+                _showCustomRecurrenceDialog();
               },
             ),
             const SizedBox(height: AppSpacing.md),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showCustomRecurrenceDialog() {
+    var frequency = _recurrenceRule?.frequency ?? RecurrenceFrequency.weekly;
+    var interval = _recurrenceRule?.interval ?? 1;
+    var selectedDays = List<int>.from(_recurrenceRule?.byWeekDay ?? []);
+    DateTime? untilDate = _recurrenceRule?.until;
+    int? count = _recurrenceRule?.count;
+    var endType = 'never'; // 'never', 'after', 'on'
+    if (count != null) endType = 'after';
+    if (untilDate != null) endType = 'on';
+
+    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final theme = Theme.of(context);
+          return AlertDialog(
+            title: const Text('Custom Recurrence'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Frequency
+                  DropdownButtonFormField<RecurrenceFrequency>(
+                    value: frequency,
+                    decoration: const InputDecoration(labelText: 'Repeat every'),
+                    items: RecurrenceFrequency.values.map((f) {
+                      return DropdownMenuItem(
+                        value: f,
+                        child: Text(f.name[0].toUpperCase() + f.name.substring(1)),
+                      );
+                    }).toList(),
+                    onChanged: (v) {
+                      if (v != null) setDialogState(() => frequency = v);
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+
+                  // Interval
+                  Row(
+                    children: [
+                      const Text('Every '),
+                      SizedBox(
+                        width: 60,
+                        child: TextFormField(
+                          initialValue: '$interval',
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
+                          onChanged: (v) {
+                            final parsed = int.tryParse(v);
+                            if (parsed != null && parsed > 0) {
+                              setDialogState(() => interval = parsed);
+                            }
+                          },
+                        ),
+                      ),
+                      Text(' ${frequency.name}(s)'),
+                    ],
+                  ),
+
+                  // Day selection for weekly
+                  if (frequency == RecurrenceFrequency.weekly) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Text('On days:', style: theme.textTheme.labelLarge),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: 4,
+                      children: List.generate(7, (i) {
+                        final isSelected = selectedDays.contains(i);
+                        return FilterChip(
+                          label: Text(dayNames[i]),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setDialogState(() {
+                              if (selected) {
+                                selectedDays.add(i);
+                              } else {
+                                selectedDays.remove(i);
+                              }
+                            });
+                          },
+                          visualDensity: VisualDensity.compact,
+                        );
+                      }),
+                    ),
+                  ],
+
+                  const SizedBox(height: AppSpacing.md),
+                  Text('Ends:', style: theme.textTheme.labelLarge),
+                  RadioListTile<String>(
+                    title: const Text('Never'),
+                    value: 'never',
+                    groupValue: endType,
+                    onChanged: (v) => setDialogState(() => endType = v!),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  RadioListTile<String>(
+                    title: Row(
+                      children: [
+                        const Text('After '),
+                        SizedBox(
+                          width: 50,
+                          child: TextFormField(
+                            initialValue: '${count ?? 10}',
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            onChanged: (v) {
+                              final parsed = int.tryParse(v);
+                              if (parsed != null) {
+                                setDialogState(() => count = parsed);
+                              }
+                            },
+                          ),
+                        ),
+                        const Text(' times'),
+                      ],
+                    ),
+                    value: 'after',
+                    groupValue: endType,
+                    onChanged: (v) => setDialogState(() => endType = v!),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  RadioListTile<String>(
+                    title: Row(
+                      children: [
+                        const Text('On '),
+                        TextButton(
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: untilDate ?? _startDate.add(const Duration(days: 30)),
+                              firstDate: _startDate,
+                              lastDate: _startDate.add(const Duration(days: 365 * 5)),
+                            );
+                            if (picked != null) {
+                              setDialogState(() => untilDate = picked);
+                            }
+                          },
+                          child: Text(
+                            untilDate != null
+                                ? DateFormat('MMM d, yyyy').format(untilDate!)
+                                : 'Select date',
+                          ),
+                        ),
+                      ],
+                    ),
+                    value: 'on',
+                    groupValue: endType,
+                    onChanged: (v) => setDialogState(() => endType = v!),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _recurrenceRule = RecurrenceRule(
+                      frequency: frequency,
+                      interval: interval,
+                      byWeekDay: frequency == RecurrenceFrequency.weekly ? selectedDays : [],
+                      byMonthDay: frequency == RecurrenceFrequency.monthly ? [_startDate.day] : [],
+                      byMonth: frequency == RecurrenceFrequency.yearly ? [_startDate.month] : [],
+                      count: endType == 'after' ? (count ?? 10) : null,
+                      until: endType == 'on' ? untilDate : null,
+                    );
+                  });
+                  Navigator.pop(context);
+                },
+                child: const Text('Done'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -519,9 +732,10 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     };
 
     // Create the Event object
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id ?? '';
     final event = Event(
       id: const Uuid().v4(),
-      userId: '', // Will be set by the backend
+      userId: currentUserId,
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim().isNotEmpty
           ? _descriptionController.text.trim()
@@ -534,6 +748,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
           : null,
       priority: priority,
       tags: _tags,
+      recurrenceRule: _recurrenceRule,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );

@@ -421,3 +421,125 @@ async def check_time_conflicts(
         "conflicts": result.conflicts,
         "suggestions": result.suggestions,
     }
+
+
+import secrets
+
+
+@router.post("/{event_id}/invite-link")
+async def create_invite_link(
+    event_id: UUID,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """
+    Generate a shareable invite link for a private event.
+    Only the event owner can create invite links.
+    """
+    event_response = supabase.table("events").select("*").eq(
+        "id", str(event_id)
+    ).eq("owner_id", str(user.id)).is_("deleted_at", "null").single().execute()
+
+    if not event_response.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found or you don't own it",
+        )
+
+    # Generate a unique invite token
+    token = secrets.token_urlsafe(32)
+
+    invite_data = {
+        "id": str(uuid4()),
+        "event_id": str(event_id),
+        "created_by": str(user.id),
+        "token": token,
+        "is_active": True,
+        "max_uses": None,
+        "use_count": 0,
+    }
+
+    supabase.table("event_invites").insert(invite_data).execute()
+
+    return {
+        "invite_link": f"ctrlshiftdate://event/invite/{token}",
+        "token": token,
+    }
+
+
+@router.post("/invite/{token}/accept")
+async def accept_invite(
+    token: str,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Accept an event invite using a token link."""
+    invite = supabase.table("event_invites").select("*").eq(
+        "token", token
+    ).eq("is_active", True).single().execute()
+
+    if not invite.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid or expired invite link",
+        )
+
+    inv = invite.data
+    event_id = inv["event_id"]
+
+    # Check max uses
+    if inv.get("max_uses") and inv["use_count"] >= inv["max_uses"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invite link has reached maximum uses",
+        )
+
+    # Check if already shared
+    existing = supabase.table("event_shares").select("id").eq(
+        "event_id", event_id
+    ).eq("shared_with_user_id", str(user.id)).execute()
+
+    if existing.data:
+        return {"message": "You already have access to this event"}
+
+    # Create share
+    share_data = {
+        "id": str(uuid4()),
+        "event_id": event_id,
+        "shared_with_user_id": str(user.id),
+        "shared_by_user_id": inv["created_by"],
+        "permission": "view",
+        "response": "accepted",
+    }
+
+    supabase.table("event_shares").insert(share_data).execute()
+
+    # Increment use count
+    supabase.table("event_invites").update({
+        "use_count": inv["use_count"] + 1,
+    }).eq("id", inv["id"]).execute()
+
+    return {"message": "Invite accepted! Event added to your calendar."}
+
+
+@router.delete("/{event_id}/invite-link/{token}")
+async def revoke_invite_link(
+    event_id: UUID,
+    token: str,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Revoke an invite link (owner only)."""
+    # Verify ownership
+    event_response = supabase.table("events").select("owner_id").eq(
+        "id", str(event_id)
+    ).single().execute()
+
+    if not event_response.data or event_response.data["owner_id"] != str(user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the event owner can revoke invite links",
+        )
+
+    supabase.table("event_invites").update({
+        "is_active": False,
+    }).eq("token", token).eq("event_id", str(event_id)).execute()
+
+    return {"message": "Invite link revoked"}

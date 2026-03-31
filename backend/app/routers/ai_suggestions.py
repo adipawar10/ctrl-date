@@ -100,7 +100,21 @@ OUTPUT FORMAT (strict JSON):
 
 async def call_llm(system: str, prompt: str) -> dict:
     """Call the LLM API and return parsed JSON response."""
-    if settings.LLM_PROVIDER == "anthropic":
+    if settings.LLM_PROVIDER == "gemini":
+        import google.generativeai as genai
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        model = genai.GenerativeModel(
+            settings.LLM_MODEL,
+            system_instruction=system,
+        )
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                response_mime_type="application/json",
+            ),
+        )
+        content = response.text
+    elif settings.LLM_PROVIDER == "anthropic":
         import anthropic
         client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
         response = client.messages.create(

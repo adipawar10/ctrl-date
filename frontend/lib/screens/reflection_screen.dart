@@ -3,17 +3,21 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../router.dart';
 import '../theme.dart';
+import '../models/reflection.dart';
+import '../providers/reflection_provider.dart';
+import '../providers/events_provider.dart';
 import '../widgets/progress_indicator.dart' as app;
 import '../widgets/event_card.dart';
 import '../services/streak_service.dart';
 
 /// Reflection screen for daily review
-class ReflectionScreen extends StatefulWidget {
+class ReflectionScreen extends ConsumerStatefulWidget {
   final DateTime date;
 
   const ReflectionScreen({
@@ -22,10 +26,10 @@ class ReflectionScreen extends StatefulWidget {
   });
 
   @override
-  State<ReflectionScreen> createState() => _ReflectionScreenState();
+  ConsumerState<ReflectionScreen> createState() => _ReflectionScreenState();
 }
 
-class _ReflectionScreenState extends State<ReflectionScreen> {
+class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
   late DateTime _selectedDate;
   final _notesController = TextEditingController();
   int? _selectedMood;
@@ -175,6 +179,11 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
               onPressed: _saveReflection,
               child: const Text('Save'),
             ),
+          IconButton(
+            icon: const Icon(Icons.menu),
+            tooltip: 'Reflection history',
+            onPressed: _showReflectionHistory,
+          ),
         ],
       ),
       body: _isLoading
@@ -791,6 +800,28 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
     }
   }
 
+  void _showReflectionHistory() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => _ReflectionHistorySheet(
+          scrollController: scrollController,
+          onDateSelected: (date) {
+            Navigator.pop(context);
+            setState(() => _selectedDate = date);
+            _loadReflection();
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _saveReflection() async {
     // TODO: Implement save to API
     final reflectionData = {
@@ -809,6 +840,298 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Reflection saved')),
+    );
+  }
+}
+
+/// Bottom sheet showing reflection history
+class _ReflectionHistorySheet extends ConsumerWidget {
+  final ScrollController scrollController;
+  final ValueChanged<DateTime> onDateSelected;
+
+  const _ReflectionHistorySheet({
+    required this.scrollController,
+    required this.onDateSelected,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final last30Days = DateRange(
+      start: DateTime.now().subtract(const Duration(days: 30)),
+      end: DateTime.now(),
+    );
+    final reflectionsAsync = ref.watch(reflectionsForDateRangeProvider(last30Days));
+    final statsAsync = ref.watch(reflectionStatsProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Handle
+        Center(
+          child: Container(
+            margin: const EdgeInsets.only(top: AppSpacing.sm),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.gray300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+        // Header
+        Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Reflection History',
+                style: theme.textTheme.titleLarge,
+              ),
+              // Stats summary
+              statsAsync.when(
+                data: (stats) => Row(
+                  children: [
+                    Icon(
+                      Icons.local_fire_department,
+                      size: 20,
+                      color: stats.currentStreak > 0
+                          ? AppColors.warning
+                          : AppColors.gray400,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${stats.currentStreak} day streak',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        // Stats row
+        statsAsync.when(
+          data: (stats) => Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                _StatChip(
+                  label: 'Total',
+                  value: '${stats.totalReflections}',
+                  icon: Icons.calendar_today,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                _StatChip(
+                  label: 'Longest',
+                  value: '${stats.longestStreak}d',
+                  icon: Icons.emoji_events,
+                ),
+                if (stats.averageMood != null) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  _StatChip(
+                    label: 'Avg Mood',
+                    value: stats.averageMood!.toStringAsFixed(1),
+                    icon: Icons.sentiment_satisfied,
+                  ),
+                ],
+                if (stats.averageProductivity != null) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  _StatChip(
+                    label: 'Avg Prod',
+                    value: stats.averageProductivity!.toStringAsFixed(1),
+                    icon: Icons.trending_up,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+        const Divider(height: 1),
+        // Reflections list
+        Expanded(
+          child: reflectionsAsync.when(
+            data: (reflections) {
+              if (reflections.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.history, size: 64, color: AppColors.gray300),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        'No reflections yet',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: AppColors.gray500,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Complete today\'s reflection to get started',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.gray400,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                controller: scrollController,
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                itemCount: reflections.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final r = reflections[index];
+                  final isToday = _isSameDay(r.date, DateTime.now());
+
+                  return ListTile(
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: r.mood != null
+                            ? AppColors.getMoodColor(r.mood!.value)
+                            : AppColors.gray100,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Center(
+                        child: Text(
+                          r.mood != null ? _moodEmoji(r.mood!.value) : '—',
+                          style: const TextStyle(fontSize: 20),
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      isToday
+                          ? 'Today'
+                          : DateFormat('EEEE, MMM d').format(r.date),
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: isToday ? FontWeight.w700 : null,
+                      ),
+                    ),
+                    subtitle: Row(
+                      children: [
+                        if (r.productivity != null)
+                          Text(
+                            'Productivity: ${r.productivity!.label}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppColors.gray600,
+                            ),
+                          ),
+                        if (r.productivity != null && r.notes != null)
+                          Text(
+                            ' · ',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppColors.gray400,
+                            ),
+                          ),
+                        if (r.notes != null)
+                          Expanded(
+                            child: Text(
+                              r.notes!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppColors.gray500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                    ),
+                    trailing: const Icon(Icons.chevron_right, size: 20),
+                    onTap: () => onDateSelected(r.date),
+                  );
+                },
+              );
+            },
+            loading: () =>
+                const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error: $e')),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _moodEmoji(int mood) {
+    switch (mood) {
+      case 1:
+        return ':(';
+      case 2:
+        return ':|';
+      case 3:
+        return ':)';
+      case 4:
+        return ':D';
+      case 5:
+        return 'XD';
+      default:
+        return ':)';
+    }
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+}
+
+/// Small stat chip for the history header
+class _StatChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _StatChip({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.gray100,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 16, color: AppColors.gray600),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppColors.gray500,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

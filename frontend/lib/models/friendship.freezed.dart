@@ -33,6 +33,10 @@ mixin _$Friendship {
   bool get isFavorite => throw _privateConstructorUsedError;
   bool get isMuted => throw _privateConstructorUsedError;
   String? get sharedKey => throw _privateConstructorUsedError;
+  @JsonKey(name: 'streak_count')
+  int get streakCount => throw _privateConstructorUsedError;
+  @JsonKey(name: 'longest_streak')
+  int get longestStreak => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -59,7 +63,9 @@ abstract class $FriendshipCopyWith<$Res> {
       DateTime? acceptedAt,
       bool isFavorite,
       bool isMuted,
-      String? sharedKey});
+      String? sharedKey,
+      @JsonKey(name: 'streak_count') int streakCount,
+      @JsonKey(name: 'longest_streak') int longestStreak});
 
   $UserProfileCopyWith<$Res>? get requester;
   $UserProfileCopyWith<$Res>? get addressee;
@@ -91,6 +97,8 @@ class _$FriendshipCopyWithImpl<$Res, $Val extends Friendship>
     Object? isFavorite = null,
     Object? isMuted = null,
     Object? sharedKey = freezed,
+    Object? streakCount = null,
+    Object? longestStreak = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -145,6 +153,14 @@ class _$FriendshipCopyWithImpl<$Res, $Val extends Friendship>
           ? _value.sharedKey
           : sharedKey // ignore: cast_nullable_to_non_nullable
               as String?,
+      streakCount: null == streakCount
+          ? _value.streakCount
+          : streakCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      longestStreak: null == longestStreak
+          ? _value.longestStreak
+          : longestStreak // ignore: cast_nullable_to_non_nullable
+              as int,
     ) as $Val);
   }
 
@@ -194,7 +210,9 @@ abstract class _$$FriendshipImplCopyWith<$Res>
       DateTime? acceptedAt,
       bool isFavorite,
       bool isMuted,
-      String? sharedKey});
+      String? sharedKey,
+      @JsonKey(name: 'streak_count') int streakCount,
+      @JsonKey(name: 'longest_streak') int longestStreak});
 
   @override
   $UserProfileCopyWith<$Res>? get requester;
@@ -226,6 +244,8 @@ class __$$FriendshipImplCopyWithImpl<$Res>
     Object? isFavorite = null,
     Object? isMuted = null,
     Object? sharedKey = freezed,
+    Object? streakCount = null,
+    Object? longestStreak = null,
   }) {
     return _then(_$FriendshipImpl(
       id: null == id
@@ -280,6 +300,14 @@ class __$$FriendshipImplCopyWithImpl<$Res>
           ? _value.sharedKey
           : sharedKey // ignore: cast_nullable_to_non_nullable
               as String?,
+      streakCount: null == streakCount
+          ? _value.streakCount
+          : streakCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      longestStreak: null == longestStreak
+          ? _value.longestStreak
+          : longestStreak // ignore: cast_nullable_to_non_nullable
+              as int,
     ));
   }
 }
@@ -300,7 +328,9 @@ class _$FriendshipImpl extends _Friendship {
       this.acceptedAt,
       this.isFavorite = false,
       this.isMuted = false,
-      this.sharedKey})
+      this.sharedKey,
+      @JsonKey(name: 'streak_count') this.streakCount = 0,
+      @JsonKey(name: 'longest_streak') this.longestStreak = 0})
       : super._();
 
   factory _$FriendshipImpl.fromJson(Map<String, dynamic> json) =>
@@ -335,10 +365,16 @@ class _$FriendshipImpl extends _Friendship {
   final bool isMuted;
   @override
   final String? sharedKey;
+  @override
+  @JsonKey(name: 'streak_count')
+  final int streakCount;
+  @override
+  @JsonKey(name: 'longest_streak')
+  final int longestStreak;
 
   @override
   String toString() {
-    return 'Friendship(id: $id, requesterId: $requesterId, addresseeId: $addresseeId, status: $status, requester: $requester, addressee: $addressee, nickname: $nickname, createdAt: $createdAt, updatedAt: $updatedAt, acceptedAt: $acceptedAt, isFavorite: $isFavorite, isMuted: $isMuted, sharedKey: $sharedKey)';
+    return 'Friendship(id: $id, requesterId: $requesterId, addresseeId: $addresseeId, status: $status, requester: $requester, addressee: $addressee, nickname: $nickname, createdAt: $createdAt, updatedAt: $updatedAt, acceptedAt: $acceptedAt, isFavorite: $isFavorite, isMuted: $isMuted, sharedKey: $sharedKey, streakCount: $streakCount, longestStreak: $longestStreak)';
   }
 
   @override
@@ -368,7 +404,11 @@ class _$FriendshipImpl extends _Friendship {
                 other.isFavorite == isFavorite) &&
             (identical(other.isMuted, isMuted) || other.isMuted == isMuted) &&
             (identical(other.sharedKey, sharedKey) ||
-                other.sharedKey == sharedKey));
+                other.sharedKey == sharedKey) &&
+            (identical(other.streakCount, streakCount) ||
+                other.streakCount == streakCount) &&
+            (identical(other.longestStreak, longestStreak) ||
+                other.longestStreak == longestStreak));
   }
 
   @JsonKey(ignore: true)
@@ -387,7 +427,9 @@ class _$FriendshipImpl extends _Friendship {
       acceptedAt,
       isFavorite,
       isMuted,
-      sharedKey);
+      sharedKey,
+      streakCount,
+      longestStreak);
 
   @JsonKey(ignore: true)
   @override
@@ -405,19 +447,22 @@ class _$FriendshipImpl extends _Friendship {
 
 abstract class _Friendship extends Friendship {
   const factory _Friendship(
-      {required final String id,
-      required final String requesterId,
-      required final String addresseeId,
-      final FriendshipStatus status,
-      final UserProfile? requester,
-      final UserProfile? addressee,
-      final String? nickname,
-      final DateTime? createdAt,
-      final DateTime? updatedAt,
-      final DateTime? acceptedAt,
-      final bool isFavorite,
-      final bool isMuted,
-      final String? sharedKey}) = _$FriendshipImpl;
+          {required final String id,
+          required final String requesterId,
+          required final String addresseeId,
+          final FriendshipStatus status,
+          final UserProfile? requester,
+          final UserProfile? addressee,
+          final String? nickname,
+          final DateTime? createdAt,
+          final DateTime? updatedAt,
+          final DateTime? acceptedAt,
+          final bool isFavorite,
+          final bool isMuted,
+          final String? sharedKey,
+          @JsonKey(name: 'streak_count') final int streakCount,
+          @JsonKey(name: 'longest_streak') final int longestStreak}) =
+      _$FriendshipImpl;
   const _Friendship._() : super._();
 
   factory _Friendship.fromJson(Map<String, dynamic> json) =
@@ -449,6 +494,12 @@ abstract class _Friendship extends Friendship {
   bool get isMuted;
   @override
   String? get sharedKey;
+  @override
+  @JsonKey(name: 'streak_count')
+  int get streakCount;
+  @override
+  @JsonKey(name: 'longest_streak')
+  int get longestStreak;
   @override
   @JsonKey(ignore: true)
   _$$FriendshipImplCopyWith<_$FriendshipImpl> get copyWith =>

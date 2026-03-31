@@ -3,16 +3,19 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../router.dart';
 import '../theme.dart';
+import '../providers/events_provider.dart';
+import '../models/event.dart';
 import '../widgets/time_slot_widget.dart';
 import '../widgets/event_card.dart';
 
 /// Day view screen showing hourly breakdown
-class DayViewScreen extends StatefulWidget {
+class DayViewScreen extends ConsumerStatefulWidget {
   final DateTime initialDate;
 
   const DayViewScreen({
@@ -21,46 +24,15 @@ class DayViewScreen extends StatefulWidget {
   });
 
   @override
-  State<DayViewScreen> createState() => _DayViewScreenState();
+  ConsumerState<DayViewScreen> createState() => _DayViewScreenState();
 }
 
-class _DayViewScreenState extends State<DayViewScreen> {
+class _DayViewScreenState extends ConsumerState<DayViewScreen> {
   late DateTime _selectedDate;
   late ScrollController _scrollController;
   final double _hourHeight = 60.0;
   final int _startHour = 6;
   final int _endHour = 22;
-
-  // Mock data - replace with actual state management
-  final List<Map<String, dynamic>> _events = [
-    {
-      'id': '1',
-      'title': 'Team Standup',
-      'start_time': DateTime.now().copyWith(hour: 9, minute: 0),
-      'end_time': DateTime.now().copyWith(hour: 9, minute: 30),
-      'is_locked': true,
-      'priority': 3,
-      'status': 'scheduled',
-    },
-    {
-      'id': '2',
-      'title': 'Deep Work: Project Alpha',
-      'start_time': DateTime.now().copyWith(hour: 10, minute: 0),
-      'end_time': DateTime.now().copyWith(hour: 12, minute: 0),
-      'is_locked': false,
-      'priority': 4,
-      'status': 'scheduled',
-    },
-    {
-      'id': '4',
-      'title': 'Client Meeting',
-      'start_time': DateTime.now().copyWith(hour: 14, minute: 0),
-      'end_time': DateTime.now().copyWith(hour: 15, minute: 0),
-      'is_locked': true,
-      'priority': 4,
-      'status': 'scheduled',
-    },
-  ];
 
   @override
   void initState() {
@@ -102,6 +74,11 @@ class _DayViewScreenState extends State<DayViewScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isToday = _isSameDay(_selectedDate, DateTime.now());
+    final dateRange = DateRange(
+      DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
+      DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 23, 59, 59),
+    );
+    final eventsAsync = ref.watch(eventsForDateRangeProvider(dateRange));
 
     return Scaffold(
       appBar: AppBar(
@@ -132,21 +109,100 @@ class _DayViewScreenState extends State<DayViewScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Date navigation
-          _buildDateNavigation(context),
+      body: eventsAsync.when(
+        data: (events) {
+          // Convert Event models to maps for compatibility with existing widgets
+          final eventMaps = events.map((e) => {
+            'id': e.id,
+            'title': e.title,
+            'start_time': e.startTime,
+            'end_time': e.endTime,
+            'is_locked': false,
+            'priority': e.priority.index + 1,
+            'status': e.status.name,
+          }).toList();
 
-          // Day timeline
-          Expanded(
-            child: _buildDayTimeline(context),
-          ),
-        ],
+          return Column(
+            children: [
+              // Daily productivity score bar
+              _buildProductivityBar(context, eventMaps),
+              // Date navigation
+              _buildDateNavigation(context),
+              // Day timeline
+              Expanded(
+                child: _buildDayTimeline(context, eventMaps),
+              ),
+            ],
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error loading events: $e')),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.goToCreateEvent(_selectedDate),
         tooltip: 'Create Event',
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildProductivityBar(BuildContext context, List<Map<String, dynamic>> events) {
+    final theme = Theme.of(context);
+    final total = events.length;
+    if (total == 0) return const SizedBox.shrink();
+
+    final completed = events.where((e) => e['status'] == 'completed').length;
+    final partial = events.where((e) => e['status'] == 'partial').length;
+    final skipped = events.where((e) => e['status'] == 'skipped').length;
+    final score = total > 0 ? ((completed + partial * 0.5) / total * 100).round() : 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      color: score >= 70
+          ? AppColors.completed.withValues(alpha: 0.05)
+          : score >= 40
+              ? AppColors.partial.withValues(alpha: 0.05)
+              : AppColors.gray100,
+      child: Row(
+        children: [
+          Text(
+            '$score%',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: score >= 70
+                  ? AppColors.completed
+                  : score >= 40
+                      ? AppColors.partial
+                      : AppColors.gray600,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: score / 100,
+                backgroundColor: AppColors.gray200,
+                color: score >= 70
+                    ? AppColors.completed
+                    : score >= 40
+                        ? AppColors.partial
+                        : AppColors.gray400,
+                minHeight: 6,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            '$completed✓ $partial~ $skipped✗',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.gray600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -192,7 +248,7 @@ class _DayViewScreenState extends State<DayViewScreen> {
     );
   }
 
-  Widget _buildDayTimeline(BuildContext context) {
+  Widget _buildDayTimeline(BuildContext context, List<Map<String, dynamic>> events) {
     return SingleChildScrollView(
       controller: _scrollController,
       child: Stack(
@@ -217,7 +273,7 @@ class _DayViewScreenState extends State<DayViewScreen> {
             _buildCurrentTimeIndicator(context),
 
           // Events overlay
-          ..._buildEventOverlays(context),
+          ..._buildEventOverlays(context, events),
         ],
       ),
     );
@@ -258,10 +314,10 @@ class _DayViewScreenState extends State<DayViewScreen> {
     );
   }
 
-  List<Widget> _buildEventOverlays(BuildContext context) {
+  List<Widget> _buildEventOverlays(BuildContext context, List<Map<String, dynamic>> events) {
     final overlays = <Widget>[];
 
-    for (final event in _events) {
+    for (final event in events) {
       final startTime = event['start_time'] as DateTime;
       final endTime = event['end_time'] as DateTime;
 
@@ -281,22 +337,114 @@ class _DayViewScreenState extends State<DayViewScreen> {
           left: 64,
           right: 8,
           height: height,
-          child: EventCard(
-            id: event['id'],
-            title: event['title'],
-            startTime: startTime,
-            endTime: endTime,
-            isLocked: event['is_locked'],
-            priority: event['priority'],
-            status: event['status'],
-            compact: height < 50,
-            onTap: () => context.goToEvent(event['id']),
+          child: GestureDetector(
+            onLongPress: () => _showStatusPicker(context, event),
+            child: EventCard(
+              id: event['id'],
+              title: event['title'],
+              startTime: startTime,
+              endTime: endTime,
+              isLocked: event['is_locked'],
+              priority: event['priority'],
+              status: event['status'],
+              compact: height < 50,
+              onTap: () => context.goToEvent(event['id']),
+            ),
           ),
         ),
       );
     }
 
     return overlays;
+  }
+
+  void _showStatusPicker(BuildContext context, Map<String, dynamic> event) {
+    final theme = Theme.of(context);
+    final currentStatus = event['status'] as String;
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                event['title'] as String,
+                style: theme.textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Mark this event as:',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.gray600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _StatusOption(
+                icon: Icons.check_circle,
+                label: 'Completed',
+                color: AppColors.completed,
+                isSelected: currentStatus == 'completed',
+                onTap: () {
+                  Navigator.pop(context);
+                  _updateEventStatus(event['id'], 'completed');
+                },
+              ),
+              _StatusOption(
+                icon: Icons.timelapse,
+                label: 'Partial',
+                color: AppColors.partial,
+                isSelected: currentStatus == 'partial',
+                onTap: () {
+                  Navigator.pop(context);
+                  _updateEventStatus(event['id'], 'partial');
+                },
+              ),
+              _StatusOption(
+                icon: Icons.skip_next,
+                label: 'Skipped',
+                color: AppColors.skipped,
+                isSelected: currentStatus == 'skipped',
+                onTap: () {
+                  Navigator.pop(context);
+                  _updateEventStatus(event['id'], 'skipped');
+                },
+              ),
+              if (currentStatus != 'scheduled')
+                _StatusOption(
+                  icon: Icons.schedule,
+                  label: 'Reset to Scheduled',
+                  color: AppColors.gray600,
+                  isSelected: false,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _updateEventStatus(event['id'], 'scheduled');
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _updateEventStatus(String eventId, String status) async {
+    try {
+      final eventStatus = EventStatus.values.firstWhere(
+        (e) => e.name == status,
+        orElse: () => EventStatus.scheduled,
+      );
+      await ref.read(eventActionsProvider).updateStatus(eventId, eventStatus);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update: $e')),
+        );
+      }
+    }
   }
 
   void _goToDate(DateTime date) {
@@ -326,5 +474,47 @@ class _DayViewScreenState extends State<DayViewScreen> {
       hour,
     );
     context.goToCreateEvent(startTime);
+  }
+}
+
+/// Status option tile for the completion picker
+class _StatusOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _StatusOption({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: isSelected ? color : AppColors.gray500,
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.w700 : null,
+          color: isSelected ? color : null,
+        ),
+      ),
+      trailing: isSelected
+          ? Icon(Icons.check, color: color)
+          : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      tileColor: isSelected ? color.withValues(alpha: 0.05) : null,
+      onTap: onTap,
+    );
   }
 }

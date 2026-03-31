@@ -18,6 +18,8 @@ import 'screens/auth_screen.dart';
 import 'screens/sign_in_screen.dart';
 import 'screens/sign_up_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/dual_calendar_screen.dart';
+import 'screens/poll_screen.dart';
 import 'providers/onboarding_provider.dart';
 import 'widgets/main_shell.dart';
 
@@ -49,6 +51,8 @@ class AppRoutes {
   // Detail routes
   static const String eventDetail = '/event/:id';
   static const String createEvent = '/event/create';
+  static const String dualCalendar = '/dual-calendar';
+  static const String polls = '/polls';
 
   /// Build event detail path with ID
   static String eventDetailPath(String id) => '/event/$id';
@@ -184,6 +188,20 @@ final GoRouter appRouter = GoRouter(
         final id = state.pathParameters['id']!;
         return EventDetailScreen(eventId: id);
       },
+    ),
+
+    GoRoute(
+      path: AppRoutes.dualCalendar,
+      name: 'dual-calendar',
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const DualCalendarScreen(),
+    ),
+
+    GoRoute(
+      path: AppRoutes.polls,
+      name: 'polls',
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const PollScreen(),
     ),
 
     // Legacy route redirects

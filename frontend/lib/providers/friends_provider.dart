@@ -133,10 +133,13 @@ class FriendshipsNotifier extends StateNotifier<AsyncValue<List<Friendship>>> {
 
   Future<void> _loadFriendships() async {
     try {
-      final response = await _api.get<List>('/friendships');
+      // FIXED: Changed from get<List> to get<Map<String, dynamic>>
+      final response = await _api.get<Map<String, dynamic>>('/friendships');
 
       if (response.isSuccess && response.data != null) {
-        final friendships = response.data!
+        // FIXED: Extract the 'friends' array from the response
+        final friendsList = response.data!['friends'] as List;
+        final friendships = friendsList
             .map((json) => Friendship.fromJson(json as Map<String, dynamic>))
             .toList();
         state = AsyncValue.data(friendships);

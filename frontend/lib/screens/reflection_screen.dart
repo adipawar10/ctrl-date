@@ -159,6 +159,12 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        // HAMBURGER MENU MOVED TO UPPER LEFT HERE
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          tooltip: 'Reflection history',
+          onPressed: _showReflectionHistory,
+        ),
         title: GestureDetector(
           onTap: _showDatePicker,
           child: Row(
@@ -179,11 +185,6 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
               onPressed: _saveReflection,
               child: const Text('Save'),
             ),
-          IconButton(
-            icon: const Icon(Icons.menu),
-            tooltip: 'Reflection history',
-            onPressed: _showReflectionHistory,
-          ),
         ],
       ),
       body: _isLoading

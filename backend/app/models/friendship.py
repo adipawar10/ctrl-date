@@ -22,6 +22,9 @@ class Friendship(BaseModel):
     status: FriendshipStatus = FriendshipStatus.PENDING
     created_at: datetime
     accepted_at: Optional[datetime] = None
+    # ADD THESE TWO FIELDS:
+    streak_count: int = 0
+    longest_streak: int = 0
 
     class Config:
         from_attributes = True

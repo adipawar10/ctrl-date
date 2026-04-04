@@ -949,10 +949,12 @@ class _ShareEventSheetState extends ConsumerState<_ShareEventSheet> {
                     itemCount: friends.length,
                     itemBuilder: (context, index) {
                       final friend = friends[index];
-                      final profile = friend.addresseeProfile ??
-                          friend.requesterProfile;
-                      final displayName =
-                          profile?.displayName ?? 'Unknown';
+                      final friendId = friend.getFriendId(
+                        Supabase.instance.client.auth.currentUser?.id ?? '',
+                      );
+                      final displayName = friend.getFriendDisplayName(
+                        Supabase.instance.client.auth.currentUser?.id ?? '',
+                      );
 
                       return ListTile(
                         leading: CircleAvatar(
@@ -973,9 +975,7 @@ class _ShareEventSheetState extends ConsumerState<_ShareEventSheet> {
                             : IconButton(
                                 icon: const Icon(Icons.send),
                                 onPressed: () => _shareWithFriend(
-                                  friend.getFriendId(
-                                    Supabase.instance.client.auth.currentUser?.id ?? '',
-                                  ),
+                                  friendId,
                                   displayName,
                                 ),
                               ),
@@ -1008,15 +1008,27 @@ class _ShareEventSheetState extends ConsumerState<_ShareEventSheet> {
       );
 
       if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Event shared with $name')),
-        );
+        if (response.isSuccess) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Event shared with $name')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response.error?.message ?? 'Failed to share event'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to share: $e')),
+          SnackBar(
+            content: Text('Failed to share: $e'),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     } finally {

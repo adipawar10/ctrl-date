@@ -950,6 +950,7 @@ UserProfile _$UserProfileFromJson(Map<String, dynamic> json) {
 mixin _$UserProfile {
   String get id => throw _privateConstructorUsedError;
   String get displayName => throw _privateConstructorUsedError;
+  String? get email => throw _privateConstructorUsedError;
   String? get avatarUrl => throw _privateConstructorUsedError;
   bool get isOnline => throw _privateConstructorUsedError;
   DateTime? get lastSeenAt => throw _privateConstructorUsedError;
@@ -969,6 +970,7 @@ abstract class $UserProfileCopyWith<$Res> {
   $Res call(
       {String id,
       String displayName,
+      String? email,
       String? avatarUrl,
       bool isOnline,
       DateTime? lastSeenAt});
@@ -989,6 +991,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
   $Res call({
     Object? id = null,
     Object? displayName = null,
+    Object? email = freezed,
     Object? avatarUrl = freezed,
     Object? isOnline = null,
     Object? lastSeenAt = freezed,
@@ -1002,6 +1005,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.displayName
           : displayName // ignore: cast_nullable_to_non_nullable
               as String,
+      email: freezed == email
+          ? _value.email
+          : email // ignore: cast_nullable_to_non_nullable
+              as String?,
       avatarUrl: freezed == avatarUrl
           ? _value.avatarUrl
           : avatarUrl // ignore: cast_nullable_to_non_nullable
@@ -1029,6 +1036,7 @@ abstract class _$$UserProfileImplCopyWith<$Res>
   $Res call(
       {String id,
       String displayName,
+      String? email,
       String? avatarUrl,
       bool isOnline,
       DateTime? lastSeenAt});
@@ -1047,6 +1055,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? displayName = null,
+    Object? email = freezed,
     Object? avatarUrl = freezed,
     Object? isOnline = null,
     Object? lastSeenAt = freezed,
@@ -1060,6 +1069,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.displayName
           : displayName // ignore: cast_nullable_to_non_nullable
               as String,
+      email: freezed == email
+          ? _value.email
+          : email // ignore: cast_nullable_to_non_nullable
+              as String?,
       avatarUrl: freezed == avatarUrl
           ? _value.avatarUrl
           : avatarUrl // ignore: cast_nullable_to_non_nullable
@@ -1082,6 +1095,7 @@ class _$UserProfileImpl implements _UserProfile {
   const _$UserProfileImpl(
       {required this.id,
       required this.displayName,
+      this.email,
       this.avatarUrl,
       this.isOnline = false,
       this.lastSeenAt});
@@ -1094,6 +1108,8 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   final String displayName;
   @override
+  final String? email;
+  @override
   final String? avatarUrl;
   @override
   @JsonKey()
@@ -1103,7 +1119,7 @@ class _$UserProfileImpl implements _UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(id: $id, displayName: $displayName, avatarUrl: $avatarUrl, isOnline: $isOnline, lastSeenAt: $lastSeenAt)';
+    return 'UserProfile(id: $id, displayName: $displayName, email: $email, avatarUrl: $avatarUrl, isOnline: $isOnline, lastSeenAt: $lastSeenAt)';
   }
 
   @override
@@ -1114,6 +1130,7 @@ class _$UserProfileImpl implements _UserProfile {
             (identical(other.id, id) || other.id == id) &&
             (identical(other.displayName, displayName) ||
                 other.displayName == displayName) &&
+            (identical(other.email, email) || other.email == email) &&
             (identical(other.avatarUrl, avatarUrl) ||
                 other.avatarUrl == avatarUrl) &&
             (identical(other.isOnline, isOnline) ||
@@ -1125,7 +1142,7 @@ class _$UserProfileImpl implements _UserProfile {
   @JsonKey(ignore: true)
   @override
   int get hashCode => Object.hash(
-      runtimeType, id, displayName, avatarUrl, isOnline, lastSeenAt);
+      runtimeType, id, displayName, email, avatarUrl, isOnline, lastSeenAt);
 
   @JsonKey(ignore: true)
   @override
@@ -1145,6 +1162,7 @@ abstract class _UserProfile implements UserProfile {
   const factory _UserProfile(
       {required final String id,
       required final String displayName,
+      final String? email,
       final String? avatarUrl,
       final bool isOnline,
       final DateTime? lastSeenAt}) = _$UserProfileImpl;
@@ -1156,6 +1174,8 @@ abstract class _UserProfile implements UserProfile {
   String get id;
   @override
   String get displayName;
+  @override
+  String? get email;
   @override
   String? get avatarUrl;
   @override

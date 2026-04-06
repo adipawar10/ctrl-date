@@ -131,21 +131,80 @@ class FriendshipsNotifier extends StateNotifier<AsyncValue<List<Friendship>>> {
 
   ApiService get _api => _ref.read(apiServiceProvider);
 
+  /// Map backend friend response to Friendship model.
+  /// Backend returns flat objects; we reconstruct the model structure.
+  Friendship _mapFriendResponse(Map<String, dynamic> json) {
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id ?? '';
+    final friendId = json['user_id'] as String? ?? '';
+    final isRequester = json['is_requester'] as bool? ?? true;
+
+    final friendProfile = UserProfile(
+      id: friendId,
+      displayName: json['display_name'] as String? ?? 'Unknown',
+      email: null,
+      avatarUrl: json['avatar_url'] as String?,
+    );
+
+    return Friendship(
+      id: json['friendship_id'] as String? ?? json['id'] as String? ?? '',
+      requesterId: isRequester ? currentUserId : friendId,
+      addresseeId: isRequester ? friendId : currentUserId,
+      status: _parseStatus(json['status'] as String? ?? 'pending'),
+      requester: isRequester ? null : friendProfile,
+      addressee: isRequester ? friendProfile : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'] as String)
+          : null,
+      acceptedAt: json['accepted_at'] != null
+          ? DateTime.tryParse(json['accepted_at'] as String)
+          : null,
+      streakCount: json['streak_count'] as int? ?? 0,
+      longestStreak: json['longest_streak'] as int? ?? 0,
+    );
+  }
+
+  FriendshipStatus _parseStatus(String status) {
+    switch (status) {
+      case 'accepted':
+        return FriendshipStatus.accepted;
+      case 'blocked':
+        return FriendshipStatus.blocked;
+      case 'declined':
+        return FriendshipStatus.declined;
+      default:
+        return FriendshipStatus.pending;
+    }
+  }
+
   Future<void> _loadFriendships() async {
     try {
-      // FIXED: Changed from get<List> to get<Map<String, dynamic>>
-      final response = await _api.get<Map<String, dynamic>>('/friendships');
+      // Fetch accepted and pending friendships separately
+      final response = await _api.get<Map<String, dynamic>>(
+        '/friends',
+        queryParams: {'status': 'accepted'},
+      );
+      final pendingResponse = await _api.get<Map<String, dynamic>>(
+        '/friends',
+        queryParams: {'status': 'pending'},
+      );
+
+      final List<Friendship> friendships = [];
 
       if (response.isSuccess && response.data != null) {
-        // FIXED: Extract the 'friends' array from the response
-        final friendsList = response.data!['friends'] as List;
-        final friendships = friendsList
-            .map((json) => Friendship.fromJson(json as Map<String, dynamic>))
-            .toList();
-        state = AsyncValue.data(friendships);
-      } else {
-        state = AsyncValue.data([]);
+        final friends = (response.data!['friends'] as List?) ?? [];
+        friendships.addAll(
+          friends.map((json) => _mapFriendResponse(json as Map<String, dynamic>)),
+        );
       }
+
+      if (pendingResponse.isSuccess && pendingResponse.data != null) {
+        final pending = (pendingResponse.data!['friends'] as List?) ?? [];
+        friendships.addAll(
+          pending.map((json) => _mapFriendResponse(json as Map<String, dynamic>)),
+        );
+      }
+
+      state = AsyncValue.data(friendships);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -169,9 +228,9 @@ class FriendshipsNotifier extends StateNotifier<AsyncValue<List<Friendship>>> {
   Future<Friendship?> sendFriendRequest(String userId, {String? message}) async {
     try {
       final response = await _api.post(
-        '/friendships',
+        '/friends/request',
         body: {
-          'addressee_id': userId,
+          'user_id': userId,
           if (message != null) 'message': message,
         },
       );
@@ -191,9 +250,9 @@ class FriendshipsNotifier extends StateNotifier<AsyncValue<List<Friendship>>> {
   /// Accept a friend request
   Future<void> acceptFriendRequest(String friendshipId) async {
     try {
-      await _api.patch(
-        '/friendships/$friendshipId',
-        body: {'status': 'accepted'},
+      await _api.put(
+        '/friends/$friendshipId/respond',
+        body: {'action': 'accept'},
       );
       await _loadFriendships();
     } catch (e) {
@@ -204,9 +263,9 @@ class FriendshipsNotifier extends StateNotifier<AsyncValue<List<Friendship>>> {
   /// Decline a friend request
   Future<void> declineFriendRequest(String friendshipId) async {
     try {
-      await _api.patch(
-        '/friendships/$friendshipId',
-        body: {'status': 'declined'},
+      await _api.put(
+        '/friends/$friendshipId/respond',
+        body: {'action': 'decline'},
       );
       await _loadFriendships();
     } catch (e) {
@@ -217,9 +276,9 @@ class FriendshipsNotifier extends StateNotifier<AsyncValue<List<Friendship>>> {
   /// Block a user
   Future<void> blockUser(String friendshipId) async {
     try {
-      await _api.patch(
-        '/friendships/$friendshipId',
-        body: {'status': 'blocked'},
+      await _api.put(
+        '/friends/$friendshipId/respond',
+        body: {'action': 'block'},
       );
       await _loadFriendships();
     } catch (e) {
@@ -230,7 +289,7 @@ class FriendshipsNotifier extends StateNotifier<AsyncValue<List<Friendship>>> {
   /// Unblock a user
   Future<void> unblockUser(String friendshipId) async {
     try {
-      await _api.delete('/friendships/$friendshipId');
+      await _api.delete('/friends/$friendshipId');
       await _loadFriendships();
     } catch (e) {
       rethrow;
@@ -240,7 +299,7 @@ class FriendshipsNotifier extends StateNotifier<AsyncValue<List<Friendship>>> {
   /// Remove a friend
   Future<void> removeFriend(String friendshipId) async {
     try {
-      await _api.delete('/friendships/$friendshipId');
+      await _api.delete('/friends/$friendshipId');
       await _loadFriendships();
     } catch (e) {
       rethrow;
@@ -259,7 +318,7 @@ class FriendshipsNotifier extends StateNotifier<AsyncValue<List<Friendship>>> {
 
     try {
       await _api.patch(
-        '/friendships/$friendshipId',
+        '/friends/$friendshipId',
         body: {'is_favorite': !friendship.isFavorite},
       );
       await _loadFriendships();
@@ -280,7 +339,7 @@ class FriendshipsNotifier extends StateNotifier<AsyncValue<List<Friendship>>> {
 
     try {
       await _api.patch(
-        '/friendships/$friendshipId',
+        '/friends/$friendshipId',
         body: {'is_muted': !friendship.isMuted},
       );
       await _loadFriendships();
@@ -293,7 +352,7 @@ class FriendshipsNotifier extends StateNotifier<AsyncValue<List<Friendship>>> {
   Future<void> updateNickname(String friendshipId, String? nickname) async {
     try {
       await _api.patch(
-        '/friendships/$friendshipId',
+        '/friends/$friendshipId',
         body: {'nickname': nickname},
       );
       await _loadFriendships();
@@ -329,10 +388,11 @@ class PokesNotifier extends StateNotifier<AsyncValue<List<Poke>>> {
 
   Future<void> _loadPokes() async {
     try {
-      final response = await _api.get<List>('/pokes');
+      final response = await _api.get<Map<String, dynamic>>('/friends/pokes');
 
       if (response.isSuccess && response.data != null) {
-        final pokes = response.data!
+        final pokesList = (response.data!['pokes'] as List?) ?? [];
+        final pokes = pokesList
             .map((json) => Poke.fromJson(json as Map<String, dynamic>))
             .toList();
         state = AsyncValue.data(pokes);
@@ -363,9 +423,8 @@ class PokesNotifier extends StateNotifier<AsyncValue<List<Poke>>> {
       {String? customMessage}) async {
     try {
       final response = await _api.post(
-        '/pokes',
+        '/friends/$userId/poke',
         body: {
-          'receiver_id': userId,
           'type': type.name,
           if (customMessage != null) 'custom_message': customMessage,
         },
@@ -386,7 +445,7 @@ class PokesNotifier extends StateNotifier<AsyncValue<List<Poke>>> {
   Future<void> markAsRead(String pokeId) async {
     try {
       await _api.patch(
-        '/pokes/$pokeId',
+        '/friends/pokes/$pokeId',
         body: {'is_read': true},
       );
       await _loadPokes();
@@ -398,7 +457,7 @@ class PokesNotifier extends StateNotifier<AsyncValue<List<Poke>>> {
   /// Mark all pokes as read
   Future<void> markAllAsRead() async {
     try {
-      await _api.post('/pokes/mark-all-read');
+      await _api.post('/friends/pokes/mark-all-read');
       await _loadPokes();
     } catch (e) {
       rethrow;

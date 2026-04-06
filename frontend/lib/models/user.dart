@@ -69,6 +69,7 @@ class UserProfile with _$UserProfile {
   const factory UserProfile({
     required String id,
     required String displayName,
+    String? email,
     String? avatarUrl,
     @Default(false) bool isOnline,
     DateTime? lastSeenAt,

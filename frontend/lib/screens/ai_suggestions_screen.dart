@@ -26,6 +26,7 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
   Map<String, dynamic>? _analysis;
 
   final Set<String> _dismissedSuggestions = {};
+  final _promptController = TextEditingController();
 
   @override
   void initState() {
@@ -34,7 +35,14 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
   }
 
   @override
+  void dispose() {
+    _promptController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final activeSuggestions = _suggestions
         .where((s) => !_dismissedSuggestions.contains(s.id))
         .toList();
@@ -50,22 +58,58 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _hasError
-              ? _buildErrorState(context)
-              : activeSuggestions.isEmpty && _analysis == null
-                  ? _buildEmptyState(context)
-                  : RefreshIndicator(
-                      onRefresh: _refreshSuggestions,
-                      child: ListView(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        children: [
-                          // Schedule analysis card
-                          if (_analysis != null) ...[
-                            _buildAnalysisCard(context),
-                            const SizedBox(height: AppSpacing.md),
-                          ],
+      body: Column(
+        children: [
+          // User prompt input
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md, AppSpacing.md, AppSpacing.md, 0,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _promptController,
+                    decoration: const InputDecoration(
+                      hintText: 'What do you want to schedule?',
+                      prefixIcon: Icon(Icons.auto_awesome),
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.sm,
+                      ),
+                    ),
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _refreshSuggestions(),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                IconButton.filled(
+                  onPressed: _isLoading ? null : _refreshSuggestions,
+                  icon: const Icon(Icons.send),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          // Main content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _hasError
+                    ? _buildErrorState(context)
+                    : activeSuggestions.isEmpty && _analysis == null
+                        ? _buildEmptyState(context)
+                        : RefreshIndicator(
+                            onRefresh: _refreshSuggestions,
+                            child: ListView(
+                              padding: const EdgeInsets.all(AppSpacing.md),
+                              children: [
+                                // Schedule analysis card
+                                if (_analysis != null) ...[
+                                  _buildAnalysisCard(context),
+                                  const SizedBox(height: AppSpacing.md),
+                                ],
                           // Suggestions list
                           ...activeSuggestions.map(
                             (suggestion) => Padding(
@@ -87,9 +131,12 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
                                 ),
                               ),
                             ),
-                        ],
-                      ),
-                    ),
+                              ],
+                            ),
+                          ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -355,12 +402,14 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
     try {
       final api = ref.read(apiServiceProvider);
       final now = DateTime.now();
+      final userPrompt = _promptController.text.trim();
       final response = await api.post<Map<String, dynamic>>(
         '/ai/suggestions',
         body: {
           'start_date': now.toIso8601String().split('T')[0],
           'end_date': now.add(const Duration(days: 7)).toIso8601String().split('T')[0],
           'max_suggestions': 5,
+          if (userPrompt.isNotEmpty) 'user_prompt': userPrompt,
         },
       );
 
@@ -370,15 +419,15 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
 
         setState(() {
           _suggestions = rawSuggestions.map((s) {
-            final start = DateTime.parse(s['proposed_start']);
-            final end = DateTime.parse(s['proposed_end']);
+            final start = DateTime.parse(s['suggestedStart']);
+            final end = DateTime.parse(s['suggestedEnd']);
             return Suggestion(
               id: s['id'] ?? '',
-              title: s['title'] ?? s['type'] ?? 'Suggestion',
-              durationMinutes: end.difference(start).inMinutes,
+              title: s['title'] ?? 'Suggestion',
+              durationMinutes: s['durationMinutes'] ?? end.difference(start).inMinutes,
               suggestedStart: start,
               suggestedEnd: end,
-              reason: s['reasoning'] ?? '',
+              reason: s['reason'] ?? '',
             );
           }).toList();
           _analysis = data['analysis'] as Map<String, dynamic>?;

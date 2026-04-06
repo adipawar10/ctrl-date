@@ -949,12 +949,12 @@ class _ShareEventSheetState extends ConsumerState<_ShareEventSheet> {
                     itemCount: friends.length,
                     itemBuilder: (context, index) {
                       final friend = friends[index];
-                      final friendId = friend.getFriendId(
-                        Supabase.instance.client.auth.currentUser?.id ?? '',
-                      );
-                      final displayName = friend.getFriendDisplayName(
-                        Supabase.instance.client.auth.currentUser?.id ?? '',
-                      );
+                      final currentUserId =
+                          Supabase.instance.client.auth.currentUser?.id ?? '';
+                      final friendId = friend.getFriendId(currentUserId);
+                      final profile = friend.getFriendProfile(currentUserId);
+                      final displayName =
+                          profile?.displayName ?? 'Unknown';
 
                       return ListTile(
                         leading: CircleAvatar(

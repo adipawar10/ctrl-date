@@ -231,17 +231,18 @@ final GoRouter appRouter = GoRouter(
       // If on an auth route, redirect to calendar (onboarding will check later)
       if (isAuthRoute) return AppRoutes.calendar;
 
-      // Check if onboarding is complete
+      // Check if onboarding and preferences are complete
       final prefs = await SharedPreferences.getInstance();
       final onboardingComplete = prefs.getBool(OnboardingKeys.onboardingComplete) ?? false;
+      final preferencesComplete = prefs.getBool(OnboardingKeys.preferencesComplete) ?? false;
 
-      // If onboarding not complete and not on onboarding route, redirect to onboarding
-      if (!onboardingComplete && !isOnboardingRoute) {
+      // If onboarding or preferences not complete, redirect to onboarding
+      if ((!onboardingComplete || !preferencesComplete) && !isOnboardingRoute) {
         return AppRoutes.onboarding;
       }
 
-      // If onboarding is complete and on onboarding route, redirect to calendar
-      if (onboardingComplete && isOnboardingRoute) {
+      // If both are complete and on onboarding route, redirect to calendar
+      if (onboardingComplete && preferencesComplete && isOnboardingRoute) {
         return AppRoutes.calendar;
       }
     }

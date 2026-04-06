@@ -10,6 +10,8 @@ import 'package:intl/intl.dart';
 import '../models/inbox.dart';
 import '../providers/inbox_provider.dart';
 import '../providers/friends_provider.dart';
+import '../services/api_service.dart';
+import '../services/encryption_service.dart';
 import '../theme.dart';
 import '../widgets/message_bubble.dart';
 
@@ -539,12 +541,79 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet> {
     );
   }
 
-  void _sendMessage() {
-    // TODO: Implement E2E encryption via backend /inbox POST
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Message sent (encrypted)')),
-    );
+  Future<void> _sendMessage() async {
+    if (_selectedRecipient == null || _messageController.text.isEmpty) return;
+
+    try {
+      final api = ApiService.instance;
+      final encryption = EncryptionService.instance;
+
+      // Get recipient's public key
+      final keyResponse = await api.get(
+        '/inbox/public-key',
+        queryParams: {'user_id': _selectedRecipient!},
+      );
+
+      if (!keyResponse.isSuccess || keyResponse.data == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not get recipient encryption key')),
+          );
+        }
+        return;
+      }
+
+      final recipientPublicKey = keyResponse.data['public_key'] as String?;
+      if (recipientPublicKey == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Recipient has no encryption key')),
+          );
+        }
+        return;
+      }
+
+      // Encrypt the message
+      final encryptedData = await encryption.encryptForUser(
+        _messageController.text,
+        recipientPublicKey,
+      );
+
+      // Get our ephemeral public key
+      final ephemeralPublicKey = await encryption.getPublicKey();
+
+      // Send via API
+      final response = await api.post(
+        '/inbox',
+        body: {
+          'recipient_id': _selectedRecipient,
+          'message_type': 'text',
+          'ciphertext': encryptedData,
+          'ephemeral_public_key': ephemeralPublicKey,
+          'nonce': '',
+        },
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              response.isSuccess
+                  ? 'Message sent (encrypted)'
+                  : 'Failed to send message',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to send message')),
+        );
+      }
+    }
   }
 }
 

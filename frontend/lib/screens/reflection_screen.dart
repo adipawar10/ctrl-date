@@ -859,8 +859,8 @@ class _ReflectionHistorySheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final last30Days = DateRange(
-      start: DateTime.now().subtract(const Duration(days: 30)),
-      end: DateTime.now(),
+      DateTime.now().subtract(const Duration(days: 30)),
+      DateTime.now(),
     );
     final reflectionsAsync = ref.watch(reflectionsForDateRangeProvider(last30Days));
     final statsAsync = ref.watch(reflectionStatsProvider);

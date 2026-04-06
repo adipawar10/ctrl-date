@@ -11,10 +11,15 @@ import '../utils/constants.dart';
 /// Keys for local storage
 class OnboardingKeys {
   static const String onboardingComplete = 'onboarding_complete';
+  static const String preferencesComplete = 'preferences_complete';
   static const String lastSeenVersion = 'last_seen_version';
   static const String userDisplayName = 'user_display_name';
   static const String userAge = 'user_age';
   static const String userAvatarUrl = 'user_avatar_url';
+  static const String userTimezone = 'user_timezone';
+  static const String userWorkingHoursStart = 'user_working_hours_start';
+  static const String userWorkingHoursEnd = 'user_working_hours_end';
+  static const String userWeekStart = 'user_week_start';
   static const String connectedGoogleCalendar = 'connected_google_calendar';
   static const String connectedAppleCalendar = 'connected_apple_calendar';
 }
@@ -22,20 +27,30 @@ class OnboardingKeys {
 /// Onboarding state
 class OnboardingState {
   final bool isComplete;
+  final bool preferencesComplete;
   final bool hasNewUpdate;
   final String? displayName;
   final int? age;
   final String? avatarUrl;
+  final String timezone;
+  final String workingHoursStart;
+  final String workingHoursEnd;
+  final String weekStart;
   final bool connectedGoogleCalendar;
   final bool connectedAppleCalendar;
   final bool isLoading;
 
   const OnboardingState({
     this.isComplete = false,
+    this.preferencesComplete = false,
     this.hasNewUpdate = false,
     this.displayName,
     this.age,
     this.avatarUrl,
+    this.timezone = 'America/New_York',
+    this.workingHoursStart = '09:00',
+    this.workingHoursEnd = '17:00',
+    this.weekStart = 'monday',
     this.connectedGoogleCalendar = false,
     this.connectedAppleCalendar = false,
     this.isLoading = true,
@@ -43,20 +58,30 @@ class OnboardingState {
 
   OnboardingState copyWith({
     bool? isComplete,
+    bool? preferencesComplete,
     bool? hasNewUpdate,
     String? displayName,
     int? age,
     String? avatarUrl,
+    String? timezone,
+    String? workingHoursStart,
+    String? workingHoursEnd,
+    String? weekStart,
     bool? connectedGoogleCalendar,
     bool? connectedAppleCalendar,
     bool? isLoading,
   }) {
     return OnboardingState(
       isComplete: isComplete ?? this.isComplete,
+      preferencesComplete: preferencesComplete ?? this.preferencesComplete,
       hasNewUpdate: hasNewUpdate ?? this.hasNewUpdate,
       displayName: displayName ?? this.displayName,
       age: age ?? this.age,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      timezone: timezone ?? this.timezone,
+      workingHoursStart: workingHoursStart ?? this.workingHoursStart,
+      workingHoursEnd: workingHoursEnd ?? this.workingHoursEnd,
+      weekStart: weekStart ?? this.weekStart,
       connectedGoogleCalendar: connectedGoogleCalendar ?? this.connectedGoogleCalendar,
       connectedAppleCalendar: connectedAppleCalendar ?? this.connectedAppleCalendar,
       isLoading: isLoading ?? this.isLoading,
@@ -83,10 +108,15 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
     if (prefs == null) return;
 
     final isComplete = prefs.getBool(OnboardingKeys.onboardingComplete) ?? false;
+    final preferencesComplete = prefs.getBool(OnboardingKeys.preferencesComplete) ?? false;
     final lastSeenVersion = prefs.getString(OnboardingKeys.lastSeenVersion);
     final displayName = prefs.getString(OnboardingKeys.userDisplayName);
     final age = prefs.getInt(OnboardingKeys.userAge);
     final avatarUrl = prefs.getString(OnboardingKeys.userAvatarUrl);
+    final timezone = prefs.getString(OnboardingKeys.userTimezone) ?? 'America/New_York';
+    final workingHoursStart = prefs.getString(OnboardingKeys.userWorkingHoursStart) ?? '09:00';
+    final workingHoursEnd = prefs.getString(OnboardingKeys.userWorkingHoursEnd) ?? '17:00';
+    final weekStart = prefs.getString(OnboardingKeys.userWeekStart) ?? 'monday';
     final connectedGoogle = prefs.getBool(OnboardingKeys.connectedGoogleCalendar) ?? false;
     final connectedApple = prefs.getBool(OnboardingKeys.connectedAppleCalendar) ?? false;
 
@@ -96,10 +126,15 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
 
     state = state.copyWith(
       isComplete: isComplete,
+      preferencesComplete: preferencesComplete,
       hasNewUpdate: hasNewUpdate,
       displayName: displayName,
       age: age,
       avatarUrl: avatarUrl,
+      timezone: timezone,
+      workingHoursStart: workingHoursStart,
+      workingHoursEnd: workingHoursEnd,
+      weekStart: weekStart,
       connectedGoogleCalendar: connectedGoogle,
       connectedAppleCalendar: connectedApple,
       isLoading: false,
@@ -155,17 +190,39 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
     await _prefs?.setBool(OnboardingKeys.connectedAppleCalendar, connected);
   }
 
+  /// Update timezone
+  Future<void> updateTimezone(String timezone) async {
+    state = state.copyWith(timezone: timezone);
+    await _prefs?.setString(OnboardingKeys.userTimezone, timezone);
+  }
+
+  /// Update working hours
+  Future<void> updateWorkingHours(String start, String end) async {
+    state = state.copyWith(workingHoursStart: start, workingHoursEnd: end);
+    await _prefs?.setString(OnboardingKeys.userWorkingHoursStart, start);
+    await _prefs?.setString(OnboardingKeys.userWorkingHoursEnd, end);
+  }
+
+  /// Update week start day
+  Future<void> updateWeekStart(String weekStart) async {
+    state = state.copyWith(weekStart: weekStart);
+    await _prefs?.setString(OnboardingKeys.userWeekStart, weekStart);
+  }
+
   /// Complete onboarding and save profile to Supabase
   Future<void> completeOnboarding() async {
+    final supabase = Supabase.instance.client;
+
     // Save to Supabase user metadata
     try {
-      await Supabase.instance.client.auth.updateUser(
+      await supabase.auth.updateUser(
         UserAttributes(
           data: {
             'display_name': state.displayName,
             'age': state.age,
             'avatar_url': state.avatarUrl,
             'onboarding_complete': true,
+            'preferences_complete': true,
             'connected_google_calendar': state.connectedGoogleCalendar,
             'connected_apple_calendar': state.connectedAppleCalendar,
           },
@@ -175,12 +232,38 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
       // Continue even if Supabase update fails - local state is saved
     }
 
+    // Save preferences to users table
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId != null) {
+        await supabase.from('users').upsert({
+          'id': userId,
+          'email': supabase.auth.currentUser?.email ?? '',
+          'display_name': state.displayName ?? 'User',
+          'avatar_url': state.avatarUrl,
+          'timezone': state.timezone,
+          'preferences': {
+            'working_hours_start': state.workingHoursStart,
+            'working_hours_end': state.workingHoursEnd,
+            'week_start': state.weekStart,
+            'default_event_duration': 60,
+            'notification_lead_time': 15,
+            'preferred_focus_hours': [9, 10, 11, 14, 15],
+          },
+        });
+      }
+    } catch (e) {
+      // Continue even if users table update fails
+    }
+
     // Save locally
     await _prefs?.setBool(OnboardingKeys.onboardingComplete, true);
+    await _prefs?.setBool(OnboardingKeys.preferencesComplete, true);
     await _prefs?.setString(OnboardingKeys.lastSeenVersion, AppConstants.appVersion);
 
     state = state.copyWith(
       isComplete: true,
+      preferencesComplete: true,
       hasNewUpdate: false,
     );
   }
@@ -197,8 +280,8 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
     state = state.copyWith(isComplete: false);
   }
 
-  /// Check if user needs onboarding
-  bool get needsOnboarding => !state.isComplete && !state.isLoading;
+  /// Check if user needs onboarding (includes preference setup)
+  bool get needsOnboarding => (!state.isComplete || !state.preferencesComplete) && !state.isLoading;
 }
 
 /// Provider for onboarding state

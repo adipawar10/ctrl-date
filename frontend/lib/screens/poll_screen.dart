@@ -189,7 +189,7 @@ class _PollScreenState extends ConsumerState<PollScreen> {
           runSpacing: AppSpacing.sm,
           children: friends.map((f) {
             final profile =
-                f.addresseeProfile ?? f.requesterProfile;
+                f.addressee ?? f.requester;
             final name = profile?.displayName ?? 'Unknown';
             final isSelected = _invitedFriendIds.contains(f.id);
 

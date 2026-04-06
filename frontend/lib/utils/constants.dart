@@ -16,7 +16,7 @@ class AppConstants {
   static const String supabaseAnonKey = 'sb_publishable_qTzpzY8e785uuv4y1tEvTA_5TROfz7q';
 
   /// API configuration
-  static const String apiBaseUrl = 'https://api.ctrldate.app/v1';
+  static const String apiBaseUrl = 'http://172.20.10.2:8000';
   static const Duration apiTimeout = Duration(seconds: 30);
 
   /// Cache configuration
@@ -293,45 +293,6 @@ class AppIconSizes {
   static const double lg = 32.0;
   static const double xl = 48.0;
   static const double xxl = 64.0;
-}
-
-/// Route names
-class AppRoutes {
-  AppRoutes._();
-
-  static const String splash = '/';
-  static const String auth = '/auth';
-  static const String login = '/auth/login';
-  static const String signup = '/auth/signup';
-  static const String forgotPassword = '/auth/forgot-password';
-
-  static const String home = '/home';
-  static const String calendar = '/calendar';
-  static const String today = '/today';
-
-  static const String events = '/events';
-  static const String eventDetails = '/events/:id';
-  static const String createEvent = '/events/create';
-  static const String editEvent = '/events/:id/edit';
-
-  static const String reflections = '/reflections';
-  static const String reflectionDetails = '/reflections/:id';
-  static const String createReflection = '/reflections/create';
-  static const String editReflection = '/reflections/:id/edit';
-
-  static const String friends = '/friends';
-  static const String friendProfile = '/friends/:id';
-  static const String addFriend = '/friends/add';
-
-  static const String inbox = '/inbox';
-  static const String messageDetails = '/inbox/:id';
-
-  static const String settings = '/settings';
-  static const String profile = '/settings/profile';
-  static const String notifications = '/settings/notifications';
-  static const String privacy = '/settings/privacy';
-  static const String appearance = '/settings/appearance';
-  static const String about = '/settings/about';
 }
 
 /// Storage keys for SharedPreferences

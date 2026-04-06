@@ -9,20 +9,25 @@
     "file": "../LICENSE"
   },
   "authors": {
-    "Michael Bui": "michael@dexterx.dev"
+    "Michael Bui": "borromini_eeckhout@simplelogin.com"
   },
   "source": {
     "path": "."
   },
-  "source_files": "Classes/**/*",
+  "source_files": "flutter_local_notifications/Sources/flutter_local_notifications/**/*.swift",
   "dependencies": {
     "FlutterMacOS": []
   },
   "platforms": {
-    "osx": "10.11"
+    "osx": "10.15"
   },
   "pod_target_xcconfig": {
     "DEFINES_MODULE": "YES"
+  },
+  "resource_bundles": {
+    "flutter_local_notifications_privacy": [
+      "flutter_local_notifications/Sources/flutter_local_notifications/PrivacyInfo.xcprivacy"
+    ]
   },
   "swift_versions": "5.0",
   "swift_version": "5.0"

@@ -10,7 +10,6 @@
 #endif
 #endif
 
-#import "Converters.h"
 
 FOUNDATION_EXPORT double flutter_local_notificationsVersionNumber;
 FOUNDATION_EXPORT const unsigned char flutter_local_notificationsVersionString[];

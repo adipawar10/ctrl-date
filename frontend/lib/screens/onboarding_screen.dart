@@ -35,6 +35,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   bool _connectingGoogle = false;
   bool _connectingApple = false;
 
+  // Preferences
+  String _selectedTimezone = 'America/New_York';
+  String _workingHoursStart = '09:00';
+  String _workingHoursEnd = '17:00';
+  String _weekStart = 'monday';
+
   @override
   void initState() {
     super.initState();
@@ -61,7 +67,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   void _nextStep() {
-    if (_currentStep < 4) {
+    if (_currentStep < 5) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,

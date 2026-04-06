@@ -71,9 +71,13 @@ class StreakService {
         case EventStatus.inProgress:
           totalScore += 0.5;
           break;
+        case EventStatus.partial:
+          totalScore += 0.75;
+          break;
         case EventStatus.cancelled:
         case EventStatus.draft:
         case EventStatus.scheduled:
+        case EventStatus.skipped:
           totalScore += 0.0;
           break;
       }

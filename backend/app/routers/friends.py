@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID, uuid4
 from fastapi import APIRouter, HTTPException, status, Depends, Query
+from pydantic import BaseModel
 
 from app.core.database import supabase
 from app.core.security import get_current_user
@@ -14,6 +15,13 @@ from app.models.friendship import (
 )
 
 router = APIRouter()
+
+
+class FriendshipUpdate(BaseModel):
+    """Schema for updating friendship metadata."""
+    is_favorite: Optional[bool] = None
+    is_muted: Optional[bool] = None
+    nickname: Optional[str] = None
 
 
 @router.get("")
@@ -263,6 +271,59 @@ async def remove_friend(
     ).execute()
 
     return {"message": "Friend removed"}
+
+
+@router.patch("/{friendship_id}")
+async def update_friendship(
+    friendship_id: UUID,
+    update: FriendshipUpdate,
+    user: User = Depends(get_current_user)
+):
+    """Update friendship metadata (favorite, mute, nickname)."""
+    # Verify friendship exists and user is part of it
+    friendship_response = supabase.table("friendships").select("*").eq(
+        "id", str(friendship_id)
+    ).or_(
+        f"requester_id.eq.{user.id},addressee_id.eq.{user.id}"
+    ).single().execute()
+
+    if not friendship_response.data:
+        raise HTTPException(status_code=404, detail="Friendship not found")
+
+    update_data = {k: v for k, v in update.dict().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    supabase.table("friendships").update(update_data).eq(
+        "id", str(friendship_id)
+    ).execute()
+
+    return {"id": str(friendship_id), **update_data}
+
+
+@router.post("/pokes/mark-all-read")
+async def mark_all_pokes_read(
+    user: User = Depends(get_current_user)
+):
+    """Mark all pokes as read for the current user."""
+    supabase.table("pokes").update(
+        {"is_read": True}
+    ).eq("receiver_id", str(user.id)).eq("is_read", False).execute()
+
+    return {"message": "All pokes marked as read"}
+
+
+@router.patch("/pokes/{poke_id}")
+async def mark_poke_read(
+    poke_id: UUID,
+    user: User = Depends(get_current_user)
+):
+    """Mark a poke as read."""
+    supabase.table("pokes").update(
+        {"is_read": True}
+    ).eq("id", str(poke_id)).eq("receiver_id", str(user.id)).execute()
+
+    return {"id": str(poke_id), "is_read": True}
 
 
 @router.post("/{friend_id}/poke")

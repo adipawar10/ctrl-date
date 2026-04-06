@@ -23,7 +23,7 @@ class User(BaseModel):
     display_name: str
     avatar_url: Optional[str] = None
     timezone: str = "UTC"
-    preferences: UserPreferences = Field(default_factory=UserPreferences)
+    preferences: Optional[UserPreferences] = Field(default_factory=UserPreferences)
     public_key: Optional[str] = None  # E2E encryption public key
     created_at: datetime
     updated_at: datetime

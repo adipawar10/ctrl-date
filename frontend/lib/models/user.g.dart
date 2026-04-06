@@ -94,6 +94,7 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
     _$UserProfileImpl(
       id: json['id'] as String,
       displayName: json['displayName'] as String,
+      email: json['email'] as String?,
       avatarUrl: json['avatarUrl'] as String?,
       isOnline: json['isOnline'] as bool? ?? false,
       lastSeenAt: json['lastSeenAt'] == null
@@ -105,6 +106,7 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'displayName': instance.displayName,
+      'email': instance.email,
       'avatarUrl': instance.avatarUrl,
       'isOnline': instance.isOnline,
       'lastSeenAt': instance.lastSeenAt?.toIso8601String(),

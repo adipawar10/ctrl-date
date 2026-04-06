@@ -77,7 +77,7 @@ class _DualCalendarScreenState extends ConsumerState<DualCalendarScreen> {
                       hint: const Text('Select a friend'),
                       items: friends.map((f) {
                         final profile =
-                            f.addresseeProfile ?? f.requesterProfile;
+                            f.addressee ?? f.requester;
                         return DropdownMenuItem(
                           value: f.id,
                           child: Text(

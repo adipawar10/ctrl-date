@@ -4,10 +4,12 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/friendship.dart';
 import '../providers/auth_provider.dart';
+import '../providers/events_provider.dart';
 import '../providers/friends_provider.dart';
 import '../theme.dart';
 import '../widgets/friend_tile.dart';
@@ -378,9 +380,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
               title: const Text('Share Event'),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  const SnackBar(content: Text('Event sharing coming soon')),
-                );
+                this.context.go('/inbox');
               },
             ),
             ListTile(
@@ -388,9 +388,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
               title: const Text('Send Message'),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  const SnackBar(content: Text('Messaging coming soon')),
-                );
+                this.context.go('/inbox');
               },
             ),
             const Divider(),
@@ -432,7 +430,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(response.error ?? 'Failed to send request'),
+              content: Text(response.error?.message ?? 'Failed to send request'),
               backgroundColor: AppColors.error,
             ),
           );

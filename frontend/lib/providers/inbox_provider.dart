@@ -62,8 +62,11 @@ class InboxNotifier extends StateNotifier<InboxState> {
   ApiService get _api => _ref.read(apiServiceProvider);
   NotificationService get _notificationService => NotificationService.instance;
 
+  bool _initialLoadDone = false;
+
   Future<void> _loadMessages({bool refresh = false}) async {
-    if (!refresh && state.isLoading) return;
+    if (_initialLoadDone && !refresh && state.isLoading) return;
+    _initialLoadDone = true;
 
     try {
       state = state.copyWith(isLoading: true, error: null);

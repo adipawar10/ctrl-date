@@ -394,6 +394,7 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
   }
 
   Future<void> _refreshSuggestions() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _hasError = false;
@@ -412,6 +413,8 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
           if (userPrompt.isNotEmpty) 'user_prompt': userPrompt,
         },
       );
+
+      if (!mounted) return;
 
       if (response.isSuccess && response.data != null) {
         final data = response.data!;
@@ -441,6 +444,7 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _hasError = true;

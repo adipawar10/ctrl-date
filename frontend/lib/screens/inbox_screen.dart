@@ -6,9 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/inbox.dart';
+import '../models/friendship.dart';
 import '../providers/inbox_provider.dart';
+import '../providers/events_provider.dart';
 import '../providers/friends_provider.dart';
 import '../services/api_service.dart';
 import '../services/encryption_service.dart';
@@ -30,7 +33,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -78,6 +81,26 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 ],
               ),
             ),
+            Tab(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Friends'),
+                  Builder(builder: (context) {
+                    final friendsCount = ref.watch(friendsProvider).valueOrNull?.length ?? 0;
+                    if (friendsCount > 0) {
+                      return Row(
+                        children: [
+                          const SizedBox(width: 4),
+                          _buildBadge('$friendsCount'),
+                        ],
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  }),
+                ],
+              ),
+            ),
             const Tab(text: 'Notifications'),
           ],
         ),
@@ -86,6 +109,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         controller: _tabController,
         children: [
           _buildMessagesList(context, inboxState),
+          _buildFriendsTab(context),
           _buildNotificationsList(context, inboxState),
         ],
       ),
@@ -314,6 +338,387 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             ref.read(inboxActionsProvider).markAsRead(notification.id);
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildFriendsTab(BuildContext context) {
+    final theme = Theme.of(context);
+    final friendshipsAsync = ref.watch(friendshipsProvider);
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id ?? '';
+
+    return friendshipsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: AppColors.gray500),
+            const SizedBox(height: AppSpacing.md),
+            Text('Failed to load friends', style: theme.textTheme.titleMedium),
+            const SizedBox(height: AppSpacing.sm),
+            ElevatedButton(
+              onPressed: () => ref.read(friendshipsProvider.notifier).refresh(),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+      data: (friendships) {
+        final accepted = friendships
+            .where((f) => f.status == FriendshipStatus.accepted)
+            .toList();
+        final pendingIncoming = friendships
+            .where((f) =>
+                f.status == FriendshipStatus.pending &&
+                f.addresseeId == currentUserId)
+            .toList();
+        final pendingOutgoing = friendships
+            .where((f) =>
+                f.status == FriendshipStatus.pending &&
+                f.requesterId == currentUserId)
+            .toList();
+
+        if (accepted.isEmpty && pendingIncoming.isEmpty && pendingOutgoing.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.people_outline, size: 64, color: theme.colorScheme.outline),
+                const SizedBox(height: AppSpacing.md),
+                Text('No friends yet', style: theme.textTheme.titleLarge),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Add friends to share events and stay accountable',
+                  style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.gray600),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                ElevatedButton.icon(
+                  onPressed: _showAddFriendDialog,
+                  icon: const Icon(Icons.person_add),
+                  label: const Text('Add Friend'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: () => ref.read(friendshipsProvider.notifier).refresh(),
+          child: ListView(
+            children: [
+              // Add friend button
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: OutlinedButton.icon(
+                  onPressed: _showAddFriendDialog,
+                  icon: const Icon(Icons.person_add),
+                  label: const Text('Add Friend'),
+                ),
+              ),
+
+              // Pending incoming requests
+              if (pendingIncoming.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs,
+                  ),
+                  child: Text('Friend Requests', style: theme.textTheme.titleSmall?.copyWith(
+                    color: AppColors.gray600,
+                  )),
+                ),
+                ...pendingIncoming.map((f) {
+                  final profile = f.getFriendProfile(currentUserId);
+                  final name = profile?.displayName ?? 'Unknown';
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.gray200,
+                      backgroundImage: profile?.avatarUrl != null
+                          ? NetworkImage(profile!.avatarUrl!)
+                          : null,
+                      child: profile?.avatarUrl == null
+                          ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                              style: const TextStyle(color: AppColors.black, fontWeight: FontWeight.w600))
+                          : null,
+                    ),
+                    title: Text(name),
+                    subtitle: const Text('Wants to be friends'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () async {
+                            await ref.read(friendActionsProvider).declineFriendRequest(f.id);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Request declined')),
+                              );
+                            }
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.check),
+                          onPressed: () async {
+                            await ref.read(friendActionsProvider).acceptFriendRequest(f.id);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Friend request accepted!')),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+
+              // Pending outgoing requests
+              if (pendingOutgoing.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs,
+                  ),
+                  child: Text('Sent Requests', style: theme.textTheme.titleSmall?.copyWith(
+                    color: AppColors.gray600,
+                  )),
+                ),
+                ...pendingOutgoing.map((f) {
+                  final profile = f.getFriendProfile(currentUserId);
+                  final name = profile?.displayName ?? 'Unknown';
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.gray200,
+                      child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                          style: const TextStyle(color: AppColors.black, fontWeight: FontWeight.w600)),
+                    ),
+                    title: Text(name),
+                    subtitle: const Text('Pending'),
+                    trailing: TextButton(
+                      onPressed: () async {
+                        await ref.read(friendActionsProvider).removeFriend(f.id);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Request cancelled')),
+                          );
+                        }
+                      },
+                      child: const Text('Cancel'),
+                    ),
+                  );
+                }),
+              ],
+
+              // Accepted friends
+              if (accepted.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs,
+                  ),
+                  child: Text('Friends (${accepted.length})', style: theme.textTheme.titleSmall?.copyWith(
+                    color: AppColors.gray600,
+                  )),
+                ),
+                ...accepted.map((f) {
+                  final profile = f.getFriendProfile(currentUserId);
+                  final name = profile?.displayName ?? 'Unknown';
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.gray200,
+                      backgroundImage: profile?.avatarUrl != null
+                          ? NetworkImage(profile!.avatarUrl!)
+                          : null,
+                      child: profile?.avatarUrl == null
+                          ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                              style: const TextStyle(color: AppColors.black, fontWeight: FontWeight.w600))
+                          : null,
+                    ),
+                    title: Text(name),
+                    subtitle: f.streakCount > 0
+                        ? Text('${f.streakCount} day streak')
+                        : null,
+                    trailing: IconButton(
+                      icon: const Icon(Icons.touch_app_outlined),
+                      tooltip: 'Poke',
+                      onPressed: () {
+                        ref.read(friendActionsProvider).sendPoke(
+                          f.getFriendId(currentUserId),
+                          PokeType.wave,
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Poke sent!')),
+                        );
+                      },
+                    ),
+                    onTap: () => _showFriendOptions(f, currentUserId),
+                  );
+                }),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddFriendDialog() {
+    final emailController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Add Friend'),
+        content: TextField(
+          controller: emailController,
+          decoration: const InputDecoration(
+            labelText: 'Email address',
+            hintText: 'friend@example.com',
+          ),
+          keyboardType: TextInputType.emailAddress,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final email = emailController.text.trim();
+              if (email.isNotEmpty) {
+                Navigator.pop(dialogContext);
+                _sendFriendRequest(email);
+              }
+            },
+            child: const Text('Send Request'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _sendFriendRequest(String email) async {
+    try {
+      final api = ref.read(apiServiceProvider);
+      final response = await api.post('/friends/request', body: {'email': email});
+
+      if (mounted) {
+        if (response.isSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Friend request sent to $email')),
+          );
+          ref.read(friendshipsProvider.notifier).refresh();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response.error?.message ?? 'Failed to send request'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send request: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showFriendOptions(Friendship friendship, String currentUserId) {
+    final profile = friendship.getFriendProfile(currentUserId);
+    final name = profile?.displayName ?? 'Unknown';
+    final friendId = friendship.getFriendId(currentUserId);
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: AppSpacing.md),
+            ListTile(
+              leading: CircleAvatar(
+                backgroundColor: AppColors.gray200,
+                backgroundImage: profile?.avatarUrl != null
+                    ? NetworkImage(profile!.avatarUrl!)
+                    : null,
+                child: profile?.avatarUrl == null
+                    ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: const TextStyle(color: AppColors.black, fontWeight: FontWeight.w600))
+                    : null,
+              ),
+              title: Text(name),
+              subtitle: friendship.streakCount > 0
+                  ? Text('${friendship.streakCount} day streak')
+                  : null,
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.touch_app),
+              title: const Text('Poke'),
+              onTap: () {
+                Navigator.pop(context);
+                ref.read(friendActionsProvider).sendPoke(friendId, PokeType.wave);
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(content: Text('Poke sent!')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.message_outlined),
+              title: const Text('Send Message'),
+              onTap: () {
+                Navigator.pop(context);
+                _composeMessage();
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: Icon(Icons.person_remove, color: AppColors.error),
+              title: Text('Remove Friend', style: TextStyle(color: AppColors.error)),
+              onTap: () {
+                Navigator.pop(context);
+                _confirmRemoveFriend(friendship.id);
+              },
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmRemoveFriend(String friendshipId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Friend'),
+        content: const Text('Are you sure you want to remove this friend?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await ref.read(friendActionsProvider).removeFriend(friendshipId);
+              if (mounted) {
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(content: Text('Friend removed')),
+                );
+              }
+            },
+            child: Text('Remove', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
       ),
     );
   }

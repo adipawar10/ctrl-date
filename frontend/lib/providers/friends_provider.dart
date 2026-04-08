@@ -178,15 +178,20 @@ class FriendshipsNotifier extends StateNotifier<AsyncValue<List<Friendship>>> {
 
   Future<void> _loadFriendships() async {
     try {
-      // Fetch accepted and pending friendships separately
-      final response = await _api.get<Map<String, dynamic>>(
-        '/friends',
-        queryParams: {'status': 'accepted'},
-      );
-      final pendingResponse = await _api.get<Map<String, dynamic>>(
-        '/friends',
-        queryParams: {'status': 'pending'},
-      );
+      // Fetch accepted and pending friendships in parallel
+      final results = await Future.wait([
+        _api.get<Map<String, dynamic>>(
+          '/friends',
+          queryParams: {'status': 'accepted'},
+        ),
+        _api.get<Map<String, dynamic>>(
+          '/friends',
+          queryParams: {'status': 'pending'},
+        ),
+      ]);
+
+      final response = results[0];
+      final pendingResponse = results[1];
 
       final List<Friendship> friendships = [];
 

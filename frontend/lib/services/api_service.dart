@@ -16,6 +16,10 @@ class ApiService {
 
   final SupabaseClient _supabase = Supabase.instance.client;
 
+  /// Shared HTTP client with connection timeout
+  final HttpClient _httpClient = HttpClient()
+    ..connectionTimeout = const Duration(seconds: 5);
+
   /// Get the current access token for authenticated requests
   String? get _accessToken => _supabase.auth.currentSession?.accessToken;
 
@@ -34,7 +38,7 @@ class ApiService {
   }) async {
     try {
       final uri = _buildUri(endpoint, queryParams);
-      final response = await HttpClient()
+      final response = await _httpClient
           .getUrl(uri)
           .then((request) {
             _baseHeaders.forEach(request.headers.add);
@@ -56,7 +60,7 @@ class ApiService {
   }) async {
     try {
       final uri = _buildUri(endpoint);
-      final request = await HttpClient().postUrl(uri);
+      final request = await _httpClient.postUrl(uri);
       _baseHeaders.forEach(request.headers.add);
 
       if (body != null) {
@@ -78,7 +82,7 @@ class ApiService {
   }) async {
     try {
       final uri = _buildUri(endpoint);
-      final request = await HttpClient().putUrl(uri);
+      final request = await _httpClient.putUrl(uri);
       _baseHeaders.forEach(request.headers.add);
 
       if (body != null) {
@@ -100,7 +104,7 @@ class ApiService {
   }) async {
     try {
       final uri = _buildUri(endpoint);
-      final request = await HttpClient().patchUrl(uri);
+      final request = await _httpClient.patchUrl(uri);
       _baseHeaders.forEach(request.headers.add);
 
       if (body != null) {
@@ -121,7 +125,7 @@ class ApiService {
   }) async {
     try {
       final uri = _buildUri(endpoint);
-      final request = await HttpClient().deleteUrl(uri);
+      final request = await _httpClient.deleteUrl(uri);
       _baseHeaders.forEach(request.headers.add);
 
       final response = await request.close().timeout(AppConstants.apiTimeout);

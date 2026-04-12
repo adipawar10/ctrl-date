@@ -181,12 +181,13 @@ async def delete_account(user: User = Depends(get_current_user)):
     try:
         user_id = str(user.id)
 
-        # Soft-delete user data in order of dependencies
-        # Delete event shares
-        supabase.table("event_shares").delete().eq("user_id", user_id).execute()
+        # Delete user data in order of dependencies
+        # Delete event shares (shared by or shared with this user)
+        supabase.table("event_shares").delete().eq("shared_by_user_id", user_id).execute()
+        supabase.table("event_shares").delete().eq("shared_with_user_id", user_id).execute()
         # Delete pokes (sent and received)
         supabase.table("pokes").delete().or_(
-            f"sender_id.eq.{user_id},receiver_id.eq.{user_id}"
+            f"poker_id.eq.{user_id},pokee_id.eq.{user_id}"
         ).execute()
         # Delete friendships
         supabase.table("friendships").delete().or_(
@@ -196,8 +197,10 @@ async def delete_account(user: User = Depends(get_current_user)):
         supabase.table("inbox_messages").delete().or_(
             f"sender_id.eq.{user_id},recipient_id.eq.{user_id}"
         ).execute()
-        # Delete reflections
-        supabase.table("reflections").delete().eq("user_id", user_id).execute()
+        # Delete daily reflections
+        supabase.table("daily_reflections").delete().eq("user_id", user_id).execute()
+        # Delete AI suggestions
+        supabase.table("ai_suggestions").delete().eq("user_id", user_id).execute()
         # Delete streaks
         supabase.table("streaks").delete().eq("user_id", user_id).execute()
         # Delete events

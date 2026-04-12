@@ -1,20 +1,36 @@
-# Ctrl+Shift+Date
+# ctrl^date (Ctrl+Shift+Date)
 
 A cross-platform productivity application that combines calendar-first planning with intelligent scheduling assistance, daily reflection, and lightweight collaboration.
 
+## Team
+
+| Name | Email |
+|------|-------|
+| Ibe Mohammed Ali | imohammedali1@student.gsu.edu |
+| Laila Hunt | lhunt24@student.gsu.edu |
+| Nazifa Chowdhury | nchowdhury15@student.gsu.edu |
+| Benjamin Weyant | bweyant1@student.gsu.edu |
+| Adi Pawar | apawar5@student.gsu.edu |
+
 ## Overview
 
-Ctrl+Shift+Date helps users plan their days and weeks, balance fixed commitments with flexible tasks, and improve productivity over time. The app runs on iOS, Android, and macOS with full offline support.
+ctrl^date helps users plan their days and weeks, balance fixed commitments with flexible tasks, and improve productivity over time. The app runs on iOS, Android, and macOS with full offline support.
 
 ### Key Features
 
 - **Smart Calendar** - Daily, weekly, monthly, and agenda views with conflict detection
 - **Event Locking** - Mark important events as "locked" to prevent AI from suggesting changes
 - **Recurring Events** - Full RFC 5545 support for complex recurrence patterns
-- **AI Scheduling** - Get intelligent suggestions to optimize your schedule
+- **AI Scheduling** - Get intelligent suggestions to optimize your schedule (powered by Claude, OpenAI, or Gemini)
 - **Daily Reflection** - Track completion rates and build productivity streaks
-- **Friends & Collaboration** - Share events and send "pokes" to friends who are procrastinating
+- **Tidy Streak** - Earn daily points by completing high-priority events; streaks reset on missed tasks
+- **Friends & Collaboration** - Share events, compare calendars (with mutual consent), and send "pokes" to friends who are procrastinating
+- **Group Scheduling** - Invite friends to events, run planning polls to find the best time, and share event notes
 - **Encrypted Inbox** - End-to-end encrypted messaging (server never sees plaintext)
+- **Calendar Comparison** - Optionally share selected events with friends for side-by-side scheduling
+- **Weather Tracker** - Get notified when weather may affect your outdoor events
+- **Dark Mode** - Full light and dark theme support
+- **Google OAuth** - Sign in with Google in addition to email/password
 - **CSV Import** - Import events from other calendars with undo support
 - **Offline-First** - Works without internet, syncs when connected
 
@@ -36,9 +52,9 @@ The app uses a **minimalist black and white design**. Color is reserved exclusiv
 | Database | PostgreSQL (Supabase) |
 | Local Storage | Drift (SQLite) |
 | Background Jobs | Celery + Redis |
-| Authentication | Supabase Auth |
+| Authentication | Supabase Auth (email/password + Google OAuth) |
 | Realtime | Supabase Realtime |
-| AI | Claude API / OpenAI |
+| AI | Claude API / OpenAI / Gemini |
 | Push Notifications | APNS (iOS) / FCM (Android) |
 
 ## Project Structure
@@ -68,7 +84,10 @@ ctrl-shift-date/
 │   ├── pubspec.yaml
 │   └── Dockerfile
 │
-└── docker-compose.yml      # Full stack orchestration
+├── TEST_RESULTS.md          # Test results and outcomes
+├── TODO.md                  # Remaining tasks and backlog
+├── test_suggestions.py      # AI suggestion test script
+└── docker-compose.yml       # Full stack orchestration
 ```
 
 ## Setup
@@ -108,6 +127,8 @@ REDIS_URL=redis://localhost:6379/0
 ANTHROPIC_API_KEY=sk-ant-...
 # or
 OPENAI_API_KEY=sk-...
+# or
+GEMINI_API_KEY=your-gemini-api-key
 ```
 
 ### Database Setup
@@ -181,7 +202,7 @@ docker-compose down
 | Endpoint | Description |
 |----------|-------------|
 | `POST /auth/register` | Register new user |
-| `POST /auth/login` | Login |
+| `POST /auth/login` | Login (email/password or Google OAuth) |
 | `GET /events` | List events in date range |
 | `POST /events` | Create event |
 | `POST /events/{id}/complete` | Mark event completion |
@@ -190,6 +211,8 @@ docker-compose down
 | `GET /inbox` | List encrypted messages |
 | `POST /inbox` | Send encrypted message |
 | `POST /reflections/{date}` | Create daily reflection |
+| `GET /streaks` | Get current streak data |
+| `POST /polls` | Create group event planning poll |
 | `POST /ai/suggestions` | Get AI scheduling suggestions |
 | `POST /sync` | Bidirectional offline sync |
 
@@ -207,15 +230,23 @@ Events marked as "locked" are hard constraints. The AI will never suggest moving
 
 ### E2E Encryption
 
-Inbox messages use X25519 key exchange with AES-256-GCM encryption. The server stores only ciphertext and cannot read message contents.
+Inbox messages use X25519 key exchange with AES-256-GCM encryption. The server stores only ciphertext and cannot read message contents. Admins cannot access encrypted message data by design.
 
 ### AI Guardrails
 
-AI suggestions go through post-processing validation to ensure:
+AI suggestions (via Claude, OpenAI, or Gemini) go through post-processing validation to ensure:
 
 - Locked events are never modified
 - Suggestions don't overlap with locked events
 - Times respect user's working hours
+
+### Asynchronous Background Processing
+
+AI suggestion generation, streak evaluation, reflection reminders, calendar synchronization, and weather conflict detection all run as background Celery workers on scheduled triggers — keeping user-facing response times low.
+
+### Role-Based Access Control
+
+The system supports `user` and `admin` roles. Admin accounts can manage user accounts and monitor the system but are restricted from reading encrypted message contents.
 
 ## Development
 
@@ -229,6 +260,9 @@ pytest
 # Frontend
 cd frontend
 flutter test
+
+# AI suggestion tests
+python test_suggestions.py
 ```
 
 ### Code Generation (Flutter)

@@ -130,6 +130,7 @@ class _PriorityOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final csd = context.csd;
     final color = AppColors.getPriorityColor(priority);
     final label = _getLabel();
 
@@ -146,7 +147,7 @@ class _PriorityOption extends StatelessWidget {
             color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
-              color: isSelected ? color : AppColors.gray200,
+              color: isSelected ? color : csd.borderLight,
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -164,7 +165,7 @@ class _PriorityOption extends StatelessWidget {
               Text(
                 label,
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: isSelected ? color : AppColors.gray600,
+                  color: isSelected ? color : csd.onSurfaceDim,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                 ),
               ),

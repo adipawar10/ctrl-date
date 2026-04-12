@@ -37,7 +37,7 @@ class _SignInScreenState extends State<SignInScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.csd.surface,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -67,7 +67,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 Text(
                   'Sign in to continue to ctrl^date',
                   style: theme.textTheme.bodyLarge?.copyWith(
-                    color: AppColors.gray600,
+                    color: context.csd.onSurfaceDim,
                   ),
                 ),
 
@@ -198,7 +198,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     Text(
                       "Don't have an account? ",
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppColors.gray600,
+                        color: context.csd.onSurfaceDim,
                       ),
                     ),
                     TextButton(

@@ -16,7 +16,7 @@ class AppConstants {
   static const String supabaseAnonKey = 'sb_publishable_qTzpzY8e785uuv4y1tEvTA_5TROfz7q';
 
   /// API configuration
-  static const String apiBaseUrl = 'http://172.20.10.2:8000';
+  static const String apiBaseUrl = 'http://localhost:8000';
   static const Duration apiTimeout = Duration(seconds: 30);
 
   /// Cache configuration

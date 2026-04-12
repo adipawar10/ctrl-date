@@ -201,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.all(AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.gray100,
+        color: context.csd.surfaceAlt,
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
@@ -217,7 +217,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 '$_completedCount/${_todayEvents.length}',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: AppColors.gray600,
+                  color: context.csd.onSurfaceDim,
                 ),
               ),
             ],
@@ -305,7 +305,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(
               'Tap the + button to add an event',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.gray600,
+                color: context.csd.onSurfaceDim,
               ),
             ),
           ],

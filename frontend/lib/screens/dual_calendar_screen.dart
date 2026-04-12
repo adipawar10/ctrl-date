@@ -133,12 +133,12 @@ class _DualCalendarScreenState extends ConsumerState<DualCalendarScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.people_outline,
-                            size: 64, color: AppColors.gray300),
+                            size: 64, color: context.csd.border),
                         const SizedBox(height: AppSpacing.md),
                         Text(
                           'Select a friend to compare calendars',
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: AppColors.gray500,
+                            color: context.csd.onSurfaceDim,
                           ),
                         ),
                       ],
@@ -174,7 +174,7 @@ class _DualCalendarScreenState extends ConsumerState<DualCalendarScreen> {
                         DateFormat('ha')
                             .format(DateTime(2024, 1, 1, hour)),
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: AppColors.gray500,
+                          color: context.csd.onSurfaceDim,
                         ),
                       ),
                     ),
@@ -192,8 +192,8 @@ class _DualCalendarScreenState extends ConsumerState<DualCalendarScreen> {
                       const EdgeInsets.symmetric(vertical: AppSpacing.xs),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: AppColors.gray100,
-                    border: Border.all(color: AppColors.gray200),
+                    color: context.csd.surfaceAlt,
+                    border: Border.all(color: context.csd.borderLight),
                   ),
                   child: Text('You',
                       style: theme.textTheme.labelMedium?.copyWith(
@@ -205,9 +205,9 @@ class _DualCalendarScreenState extends ConsumerState<DualCalendarScreen> {
                     decoration: BoxDecoration(
                       border: Border(
                         bottom:
-                            BorderSide(color: AppColors.gray200, width: 0.5),
+                            BorderSide(color: context.csd.borderLight, width: 0.5),
                         right:
-                            BorderSide(color: AppColors.gray200, width: 0.5),
+                            BorderSide(color: context.csd.borderLight, width: 0.5),
                       ),
                     ),
                   );
@@ -224,8 +224,8 @@ class _DualCalendarScreenState extends ConsumerState<DualCalendarScreen> {
                       const EdgeInsets.symmetric(vertical: AppSpacing.xs),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: AppColors.gray100,
-                    border: Border.all(color: AppColors.gray200),
+                    color: context.csd.surfaceAlt,
+                    border: Border.all(color: context.csd.borderLight),
                   ),
                   child: Text('Friend',
                       style: theme.textTheme.labelMedium?.copyWith(
@@ -237,7 +237,7 @@ class _DualCalendarScreenState extends ConsumerState<DualCalendarScreen> {
                     decoration: BoxDecoration(
                       border: Border(
                         bottom:
-                            BorderSide(color: AppColors.gray200, width: 0.5),
+                            BorderSide(color: context.csd.borderLight, width: 0.5),
                       ),
                     ),
                   );

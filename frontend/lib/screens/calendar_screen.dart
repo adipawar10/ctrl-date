@@ -52,13 +52,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: AppColors.gray100,
+                  color: context.csd.surfaceAlt,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.calendar_month,
                   size: 20,
-                  color: AppColors.black,
+                  color: context.csd.onSurface,
                 ),
               ),
               const SizedBox(width: 8),
@@ -144,18 +144,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
           style: ButtonStyle(
             backgroundColor: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.selected)) {
-                return AppColors.black;
+                return context.csd.onSurface;
               }
-              return AppColors.white;
+              return context.csd.surface;
             }),
             foregroundColor: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.selected)) {
-                return AppColors.white;
+                return context.csd.surface;
               }
-              return AppColors.black;
+              return context.csd.onSurface;
             }),
             side: WidgetStateProperty.all(
-              const BorderSide(color: AppColors.gray300),
+              BorderSide(color: context.csd.border),
             ),
           ),
         ),
@@ -593,8 +593,8 @@ class _EmbeddedDayViewState extends State<_EmbeddedDayView> {
             child: Container(
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
-                color: AppColors.white,
-                border: Border.all(color: AppColors.gray300),
+                color: context.csd.surface,
+                border: Border.all(color: context.csd.border),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: ClipRect(
@@ -617,7 +617,7 @@ class _EmbeddedDayViewState extends State<_EmbeddedDayView> {
                           Icon(
                             Icons.lock,
                             size: 12,
-                            color: AppColors.gray600,
+                            color: context.csd.iconDefault,
                           ),
                         ],
                         const SizedBox(width: 8),
@@ -627,7 +627,7 @@ class _EmbeddedDayViewState extends State<_EmbeddedDayView> {
                             style: TextStyle(
                               fontSize: height < 24 ? 10 : 12,
                               fontWeight: FontWeight.w500,
-                              color: AppColors.black,
+                              color: context.csd.onSurface,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -641,7 +641,7 @@ class _EmbeddedDayViewState extends State<_EmbeddedDayView> {
                         '${_formatHour(event['start_hour'] as int)} - ${_formatHour(event['end_hour'] as int)}',
                         style: TextStyle(
                           fontSize: 10,
-                          color: AppColors.gray600,
+                          color: context.csd.onSurfaceDim,
                         ),
                       ),
                     ],
@@ -837,14 +837,14 @@ class _EmbeddedWeekViewState extends State<_EmbeddedWeekView> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                   decoration: BoxDecoration(
-                    color: isToday ? AppColors.gray100 : null,
+                    color: isToday ? context.csd.surfaceAlt : null,
                   ),
                   child: Column(
                     children: [
                       Text(
                         DateFormat('E').format(day),
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: isToday ? AppColors.black : AppColors.gray600,
+                          color: isToday ? context.csd.onSurface : context.csd.onSurfaceDim,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -852,14 +852,14 @@ class _EmbeddedWeekViewState extends State<_EmbeddedWeekView> {
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color: isToday ? AppColors.black : null,
+                          color: isToday ? context.csd.onSurface : null,
                           shape: BoxShape.circle,
                         ),
                         alignment: Alignment.center,
                         child: Text(
                           '${day.day}',
                           style: theme.textTheme.titleSmall?.copyWith(
-                            color: isToday ? AppColors.white : AppColors.black,
+                            color: isToday ? context.csd.surface : context.csd.onSurface,
                             fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
                           ),
                         ),
@@ -922,7 +922,7 @@ class _EmbeddedWeekViewState extends State<_EmbeddedWeekView> {
                 return Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: isToday ? AppColors.gray100.withValues(alpha: 0.5) : null,
+                      color: isToday ? context.csd.surfaceAlt.withValues(alpha: 0.5) : null,
                       border: Border(
                         left: BorderSide(
                           color: theme.colorScheme.outlineVariant,
@@ -991,8 +991,8 @@ class _EmbeddedWeekViewState extends State<_EmbeddedWeekView> {
           padding: const EdgeInsets.all(4),
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
-            color: AppColors.white,
-            border: Border.all(color: AppColors.gray300),
+            color: context.csd.surface,
+            border: Border.all(color: context.csd.border),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Column(
@@ -1014,7 +1014,7 @@ class _EmbeddedWeekViewState extends State<_EmbeddedWeekView> {
                     Icon(
                       Icons.lock,
                       size: 10,
-                      color: AppColors.gray600,
+                      color: context.csd.iconDefault,
                     ),
                   ],
                   const SizedBox(width: 4),
@@ -1024,7 +1024,7 @@ class _EmbeddedWeekViewState extends State<_EmbeddedWeekView> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
-                        color: AppColors.black,
+                        color: context.csd.onSurface,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1142,7 +1142,7 @@ class _EmbeddedMonthViewState extends State<_EmbeddedMonthView> {
               child: Text(
                 day,
                 style: theme.textTheme.labelMedium?.copyWith(
-                  color: isWeekend ? AppColors.gray500 : AppColors.gray700,
+                  color: isWeekend ? context.csd.onSurfaceDim : context.csd.iconDefault,
                 ),
               ),
             ),
@@ -1200,7 +1200,7 @@ class _EmbeddedMonthViewState extends State<_EmbeddedMonthView> {
       onLongPress: () => context.goToCreateEvent(day),
       child: Container(
         decoration: BoxDecoration(
-          color: isToday ? AppColors.gray100 : null,
+          color: isToday ? context.csd.surfaceAlt : null,
           borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Column(
@@ -1210,7 +1210,7 @@ class _EmbeddedMonthViewState extends State<_EmbeddedMonthView> {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: isToday ? AppColors.black : null,
+                color: isToday ? context.csd.onSurface : null,
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
@@ -1218,10 +1218,10 @@ class _EmbeddedMonthViewState extends State<_EmbeddedMonthView> {
                 '${day.day}',
                 style: theme.textTheme.titleSmall?.copyWith(
                   color: isToday
-                      ? AppColors.white
+                      ? context.csd.surface
                       : isCurrentMonth
-                          ? AppColors.black
-                          : AppColors.gray400,
+                          ? context.csd.onSurface
+                          : context.csd.onSurfaceAlt,
                   fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
@@ -1235,7 +1235,7 @@ class _EmbeddedMonthViewState extends State<_EmbeddedMonthView> {
                     Icon(
                       Icons.lock,
                       size: 8,
-                      color: AppColors.gray600,
+                      color: context.csd.iconDefault,
                     ),
                   const SizedBox(width: 2),
                   Container(
@@ -1244,7 +1244,7 @@ class _EmbeddedMonthViewState extends State<_EmbeddedMonthView> {
                     decoration: BoxDecoration(
                       color: highestPriority != null
                           ? AppColors.getPriorityColor(highestPriority)
-                          : AppColors.gray400,
+                          : context.csd.onSurfaceAlt,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -1254,7 +1254,7 @@ class _EmbeddedMonthViewState extends State<_EmbeddedMonthView> {
                       '+${events.length - 1}',
                       style: TextStyle(
                         fontSize: 8,
-                        color: AppColors.gray600,
+                        color: context.csd.onSurfaceDim,
                       ),
                     ),
                   ],

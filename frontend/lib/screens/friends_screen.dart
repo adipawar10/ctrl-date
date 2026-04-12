@@ -99,7 +99,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: AppColors.gray500),
+              Icon(Icons.error_outline, size: 48, color: context.csd.onSurfaceDim),
               const SizedBox(height: AppSpacing.md),
               Text('Failed to load friends', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: AppSpacing.sm),
@@ -158,7 +158,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   'Add friends to share events and stay accountable',
-                  style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.gray600),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: context.csd.onSurfaceDim),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -217,7 +217,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
             const SizedBox(height: AppSpacing.sm),
             Text(
               'Friend requests will appear here',
-              style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.gray600),
+              style: theme.textTheme.bodyMedium?.copyWith(color: context.csd.onSurfaceDim),
             ),
           ],
         ),
@@ -255,15 +255,15 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
 
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: AppColors.gray200,
+        backgroundColor: context.csd.avatarBg,
         backgroundImage: friendProfile?.avatarUrl != null
             ? NetworkImage(friendProfile!.avatarUrl!)
             : null,
         child: friendProfile?.avatarUrl == null
             ? Text(
                 name.isNotEmpty ? name[0].toUpperCase() : '?',
-                style: const TextStyle(
-                  color: AppColors.black,
+                style: TextStyle(
+                  color: context.csd.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
               )
@@ -345,15 +345,15 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
             const SizedBox(height: AppSpacing.md),
             ListTile(
               leading: CircleAvatar(
-                backgroundColor: AppColors.gray200,
+                backgroundColor: context.csd.avatarBg,
                 backgroundImage: friendProfile?.avatarUrl != null
                     ? NetworkImage(friendProfile!.avatarUrl!)
                     : null,
                 child: friendProfile?.avatarUrl == null
                     ? Text(
                         name.isNotEmpty ? name[0].toUpperCase() : '?',
-                        style: const TextStyle(
-                          color: AppColors.black,
+                        style: TextStyle(
+                          color: this.context.csd.onSurface,
                           fontWeight: FontWeight.w600,
                         ),
                       )

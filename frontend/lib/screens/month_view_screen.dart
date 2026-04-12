@@ -195,7 +195,7 @@ class _MonthViewScreenState extends State<MonthViewScreen> {
               child: Text(
                 day,
                 style: theme.textTheme.labelMedium?.copyWith(
-                  color: isWeekend ? AppColors.gray500 : AppColors.gray700,
+                  color: isWeekend ? context.csd.onSurfaceDim : context.csd.iconDefault,
                 ),
               ),
             ),

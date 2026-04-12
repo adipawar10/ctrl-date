@@ -73,6 +73,7 @@ class EventCard extends StatelessWidget {
 
   Widget _buildFullCard(BuildContext context) {
     final theme = Theme.of(context);
+    final csd = context.csd;
     final isCompleted = status == 'completed';
     final isSkipped = status == 'skipped';
     final isPartial = status == 'partial';
@@ -82,10 +83,10 @@ class EventCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: _getBackgroundColor(),
+          color: _getBackgroundColor(context),
           borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
-            color: _getBorderColor(),
+            color: _getBorderColor(context),
           ),
         ),
         child: Column(
@@ -105,7 +106,7 @@ class EventCard extends StatelessWidget {
                       margin: const EdgeInsets.only(right: AppSpacing.sm),
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: AppColors.gray400,
+                          color: csd.iconDefault,
                           width: 2,
                         ),
                         borderRadius: BorderRadius.circular(AppRadius.xs),
@@ -124,7 +125,7 @@ class EventCard extends StatelessWidget {
                     child: Icon(
                       _getStatusIcon(),
                       size: 16,
-                      color: AppColors.white,
+                      color: csd.surface,
                     ),
                   ),
 
@@ -143,8 +144,8 @@ class EventCard extends StatelessWidget {
                                     ? TextDecoration.lineThrough
                                     : null,
                                 color: isCompleted || isSkipped
-                                    ? AppColors.gray500
-                                    : AppColors.black,
+                                    ? csd.onSurfaceDim
+                                    : csd.onSurface,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -164,13 +165,13 @@ class EventCard extends StatelessWidget {
                           Icon(
                             Icons.access_time,
                             size: 14,
-                            color: AppColors.gray500,
+                            color: csd.onSurfaceDim,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             '${DateFormat('HH:mm').format(startTime)} - ${DateFormat('HH:mm').format(endTime)}',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: AppColors.gray600,
+                              color: csd.onSurfaceDim,
                             ),
                           ),
                         ],
@@ -189,14 +190,14 @@ class EventCard extends StatelessWidget {
                   Icon(
                     Icons.location_on_outlined,
                     size: 14,
-                    color: AppColors.gray500,
+                    color: csd.onSurfaceDim,
                   ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       location!,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.gray600,
+                        color: csd.onSurfaceDim,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -212,7 +213,7 @@ class EventCard extends StatelessWidget {
               Text(
                 description!,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppColors.gray600,
+                  color: csd.onSurfaceDim,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -226,6 +227,7 @@ class EventCard extends StatelessWidget {
 
   Widget _buildCompactCard(BuildContext context) {
     final theme = Theme.of(context);
+    final csd = context.csd;
     final isCompleted = status == 'completed';
     final isSkipped = status == 'skipped';
 
@@ -234,9 +236,9 @@ class EventCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.sm),
         decoration: BoxDecoration(
-          color: _getBackgroundColor(),
+          color: _getBackgroundColor(context),
           borderRadius: BorderRadius.circular(AppRadius.sm),
-          border: Border.all(color: _getBorderColor()),
+          border: Border.all(color: _getBorderColor(context)),
         ),
         child: Row(
           children: [
@@ -256,7 +258,7 @@ class EventCard extends StatelessWidget {
               Icon(
                 Icons.lock,
                 size: 12,
-                color: AppColors.gray500,
+                color: csd.onSurfaceDim,
               ),
               const SizedBox(width: AppSpacing.xs),
             ],
@@ -270,8 +272,8 @@ class EventCard extends StatelessWidget {
                       ? TextDecoration.lineThrough
                       : null,
                   color: isCompleted || isSkipped
-                      ? AppColors.gray500
-                      : AppColors.black,
+                      ? csd.onSurfaceDim
+                      : csd.onSurface,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -291,33 +293,35 @@ class EventCard extends StatelessWidget {
     );
   }
 
-  Color _getBackgroundColor() {
+  Color _getBackgroundColor(BuildContext context) {
+    final csd = context.csd;
     switch (status) {
       case 'completed':
         return AppColors.completed.withValues(alpha: 0.05);
       case 'partial':
         return AppColors.partial.withValues(alpha: 0.05);
       case 'skipped':
-        return AppColors.gray100;
+        return csd.surfaceAlt;
       case 'cancelled':
         return AppColors.error.withValues(alpha: 0.05);
       default:
-        return AppColors.white;
+        return csd.surface;
     }
   }
 
-  Color _getBorderColor() {
+  Color _getBorderColor(BuildContext context) {
+    final csd = context.csd;
     switch (status) {
       case 'completed':
         return AppColors.completed.withValues(alpha: 0.3);
       case 'partial':
         return AppColors.partial.withValues(alpha: 0.3);
       case 'skipped':
-        return AppColors.gray300;
+        return csd.border;
       case 'cancelled':
         return AppColors.error.withValues(alpha: 0.3);
       default:
-        return AppColors.gray200;
+        return csd.borderLight;
     }
   }
 

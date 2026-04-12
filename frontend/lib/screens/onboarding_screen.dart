@@ -273,7 +273,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final onboarding = ref.watch(onboardingProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.csd.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -288,8 +288,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       margin: const EdgeInsets.symmetric(horizontal: 2),
                       decoration: BoxDecoration(
                         color: index <= _currentStep
-                            ? AppColors.black
-                            : AppColors.gray300,
+                            ? context.csd.onSurface
+                            : context.csd.border,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -358,13 +358,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Container(
             padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
-              color: AppColors.gray100,
+              color: context.csd.surfaceAlt,
               borderRadius: BorderRadius.circular(AppRadius.xl),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.calendar_month,
               size: 80,
-              color: AppColors.black,
+              color: context.csd.onSurface,
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
@@ -379,7 +379,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Text(
             'Let\'s set up your account so you can get the most out of your calendar.',
             style: theme.textTheme.bodyLarge?.copyWith(
-              color: AppColors.gray600,
+              color: context.csd.onSurfaceDim,
             ),
             textAlign: TextAlign.center,
           ),
@@ -403,7 +403,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Text(
             'This is how you\'ll appear in the app and to friends.',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppColors.gray600,
+              color: context.csd.onSurfaceDim,
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
@@ -420,7 +420,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Text(
             'You can change this later in settings.',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: AppColors.gray500,
+              color: context.csd.onSurfaceDim,
             ),
             textAlign: TextAlign.center,
           ),
@@ -444,7 +444,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Text(
             'This helps us personalize your experience.',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppColors.gray600,
+              color: context.csd.onSurfaceDim,
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
@@ -476,7 +476,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Text(
             'Your age is private and won\'t be shared.',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: AppColors.gray500,
+              color: context.csd.onSurfaceDim,
             ),
             textAlign: TextAlign.center,
           ),
@@ -500,7 +500,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Text(
             'Help friends recognize you with a photo.',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppColors.gray600,
+              color: context.csd.onSurfaceDim,
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
@@ -515,7 +515,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         width: 150,
                         height: 150,
                         decoration: BoxDecoration(
-                          color: AppColors.gray100,
+                          color: context.csd.surfaceAlt,
                           shape: BoxShape.circle,
                           image: _selectedImage != null
                               ? DecorationImage(
@@ -530,10 +530,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                   : null,
                         ),
                         child: _selectedImage == null && _uploadedAvatarUrl == null
-                            ? const Icon(
+                            ? Icon(
                                 Icons.person,
                                 size: 80,
-                                color: AppColors.gray400,
+                                color: context.csd.iconDefault,
                               )
                             : null,
                       ),
@@ -600,7 +600,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Text(
             'Bring your existing events into ctrl^date.',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppColors.gray600,
+              color: context.csd.onSurfaceDim,
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
@@ -646,7 +646,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             child: Text(
               'You can connect more calendars later in settings.',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: AppColors.gray500,
+                color: context.csd.onSurfaceDim,
               ),
               textAlign: TextAlign.center,
             ),
@@ -678,7 +678,7 @@ class _CalendarConnectTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: isConnected ? AppColors.gray100 : AppColors.white,
+      color: isConnected ? context.csd.surfaceAlt : context.csd.surface,
       borderRadius: BorderRadius.circular(AppRadius.md),
       child: InkWell(
         onTap: isLoading ? null : onTap,
@@ -687,7 +687,7 @@ class _CalendarConnectTile extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
             border: Border.all(
-              color: isConnected ? AppColors.success : AppColors.gray300,
+              color: isConnected ? AppColors.success : context.csd.border,
             ),
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
@@ -696,13 +696,13 @@ class _CalendarConnectTile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
-                  color: isConnected ? AppColors.success : AppColors.gray100,
+                  color: isConnected ? AppColors.success : context.csd.surfaceAlt,
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 child: Icon(
                   icon,
                   size: 24,
-                  color: isConnected ? AppColors.white : AppColors.black,
+                  color: isConnected ? AppColors.white : context.csd.onSurface,
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
@@ -719,7 +719,7 @@ class _CalendarConnectTile extends StatelessWidget {
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: isConnected
                                 ? AppColors.success
-                                : AppColors.gray600,
+                                : context.csd.onSurfaceDim,
                           ),
                     ),
                   ],
@@ -737,10 +737,10 @@ class _CalendarConnectTile extends StatelessWidget {
                   color: AppColors.success,
                 )
               else
-                const Icon(
+                Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
-                  color: AppColors.gray500,
+                  color: context.csd.onSurfaceDim,
                 ),
             ],
           ),

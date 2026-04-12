@@ -17,7 +17,7 @@ class AuthScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.csd.surface,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -32,13 +32,13 @@ class AuthScreen extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   decoration: BoxDecoration(
-                    color: AppColors.gray100,
+                    color: context.csd.surfaceAlt,
                     borderRadius: BorderRadius.circular(AppRadius.xl),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.calendar_month,
                     size: 80,
-                    color: AppColors.black,
+                    color: context.csd.onSurface,
                   ),
                 ),
               ),
@@ -60,7 +60,7 @@ class AuthScreen extends StatelessWidget {
               Text(
                 'Plan smarter. Reflect deeper. Achieve more.',
                 style: theme.textTheme.bodyLarge?.copyWith(
-                  color: AppColors.gray600,
+                  color: context.csd.onSurfaceDim,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -94,7 +94,7 @@ class AuthScreen extends StatelessWidget {
                     child: Text(
                       'or',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.gray500,
+                        color: context.csd.onSurfaceDim,
                       ),
                     ),
                   ),
@@ -111,10 +111,10 @@ class AuthScreen extends StatelessWidget {
                   'https://www.google.com/favicon.ico',
                   width: 20,
                   height: 20,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
+                  errorBuilder: (context, error, stackTrace) => Icon(
                     Icons.g_mobiledata,
                     size: 20,
-                    color: AppColors.black,
+                    color: context.csd.onSurface,
                   ),
                 ),
                 label: const Text('Continue with Google'),
@@ -128,7 +128,7 @@ class AuthScreen extends StatelessWidget {
                 child: Text(
                   'By continuing, you agree to our Terms of Service and Privacy Policy',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.gray500,
+                    color: context.csd.onSurfaceDim,
                   ),
                   textAlign: TextAlign.center,
                 ),

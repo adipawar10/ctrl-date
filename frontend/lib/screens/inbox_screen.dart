@@ -125,13 +125,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.black,
+        color: context.csd.onSurface,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
         text,
-        style: const TextStyle(
-          color: AppColors.white,
+        style: TextStyle(
+          color: context.csd.surface,
           fontSize: 10,
           fontWeight: FontWeight.w600,
         ),
@@ -168,7 +168,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             Text(
               'Messages from friends will appear here',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.gray600,
+                color: context.csd.onSurfaceDim,
               ),
             ),
           ],
@@ -233,7 +233,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             Text(
               'System notifications will appear here',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.gray600,
+                color: context.csd.onSurfaceDim,
               ),
             ),
           ],
@@ -285,28 +285,28 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       direction: DismissDirection.endToStart,
       onDismissed: (_) => _deleteMessage(notification.id),
       child: Container(
-        color: notification.isRead ? AppColors.white : AppColors.gray100,
+        color: notification.isRead ? context.csd.surface : context.csd.surfaceAlt,
         child: ListTile(
           leading: Container(
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: AppColors.gray200,
+              color: context.csd.avatarBg,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 20, color: AppColors.gray600),
+            child: Icon(icon, size: 20, color: context.csd.iconDefault),
           ),
           title: Text(
             notification.title,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: notification.isRead ? FontWeight.w500 : FontWeight.w600,
-              color: AppColors.gray700,
+              color: context.csd.onSurfaceAlt,
             ),
           ),
           subtitle: Text(
             notification.body ?? '',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: AppColors.gray500,
+              color: context.csd.onSurfaceDim,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -318,7 +318,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               Text(
                 _formatTime(notification.createdAt ?? DateTime.now()),
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: AppColors.gray500,
+                  color: context.csd.onSurfaceDim,
                 ),
               ),
               if (!notification.isRead) ...[
@@ -327,7 +327,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: AppColors.gray600,
+                    color: context.csd.onSurfaceDim,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -353,7 +353,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: AppColors.gray500),
+            Icon(Icons.error_outline, size: 48, color: context.csd.onSurfaceDim),
             const SizedBox(height: AppSpacing.md),
             Text('Failed to load friends', style: theme.textTheme.titleMedium),
             const SizedBox(height: AppSpacing.sm),
@@ -390,7 +390,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   'Add friends to share events and stay accountable',
-                  style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.gray600),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: context.csd.onSurfaceDim),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -425,7 +425,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs,
                   ),
                   child: Text('Friend Requests', style: theme.textTheme.titleSmall?.copyWith(
-                    color: AppColors.gray600,
+                    color: context.csd.onSurfaceDim,
                   )),
                 ),
                 ...pendingIncoming.map((f) {
@@ -433,13 +433,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   final name = profile?.displayName ?? 'Unknown';
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: AppColors.gray200,
+                      backgroundColor: context.csd.avatarBg,
                       backgroundImage: profile?.avatarUrl != null
                           ? NetworkImage(profile!.avatarUrl!)
                           : null,
                       child: profile?.avatarUrl == null
                           ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                              style: const TextStyle(color: AppColors.black, fontWeight: FontWeight.w600))
+                              style: TextStyle(color: context.csd.onSurface, fontWeight: FontWeight.w600))
                           : null,
                     ),
                     title: Text(name),
@@ -482,7 +482,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs,
                   ),
                   child: Text('Sent Requests', style: theme.textTheme.titleSmall?.copyWith(
-                    color: AppColors.gray600,
+                    color: context.csd.onSurfaceDim,
                   )),
                 ),
                 ...pendingOutgoing.map((f) {
@@ -490,9 +490,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   final name = profile?.displayName ?? 'Unknown';
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: AppColors.gray200,
+                      backgroundColor: context.csd.avatarBg,
                       child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                          style: const TextStyle(color: AppColors.black, fontWeight: FontWeight.w600)),
+                          style: TextStyle(color: context.csd.onSurface, fontWeight: FontWeight.w600)),
                     ),
                     title: Text(name),
                     subtitle: const Text('Pending'),
@@ -518,7 +518,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs,
                   ),
                   child: Text('Friends (${accepted.length})', style: theme.textTheme.titleSmall?.copyWith(
-                    color: AppColors.gray600,
+                    color: context.csd.onSurfaceDim,
                   )),
                 ),
                 ...accepted.map((f) {
@@ -526,13 +526,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   final name = profile?.displayName ?? 'Unknown';
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: AppColors.gray200,
+                      backgroundColor: context.csd.avatarBg,
                       backgroundImage: profile?.avatarUrl != null
                           ? NetworkImage(profile!.avatarUrl!)
                           : null,
                       child: profile?.avatarUrl == null
                           ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                              style: const TextStyle(color: AppColors.black, fontWeight: FontWeight.w600))
+                              style: TextStyle(color: context.csd.onSurface, fontWeight: FontWeight.w600))
                           : null,
                     ),
                     title: Text(name),
@@ -645,13 +645,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             const SizedBox(height: AppSpacing.md),
             ListTile(
               leading: CircleAvatar(
-                backgroundColor: AppColors.gray200,
+                backgroundColor: context.csd.avatarBg,
                 backgroundImage: profile?.avatarUrl != null
                     ? NetworkImage(profile!.avatarUrl!)
                     : null,
                 child: profile?.avatarUrl == null
                     ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                        style: const TextStyle(color: AppColors.black, fontWeight: FontWeight.w600))
+                        style: TextStyle(color: context.csd.onSurface, fontWeight: FontWeight.w600))
                     : null,
               ),
               title: Text(name),
@@ -928,13 +928,13 @@ class _ComposeMessageSheetState extends State<_ComposeMessageSheet> {
                   Icon(
                     Icons.lock,
                     size: 14,
-                    color: AppColors.gray500,
+                    color: context.csd.onSurfaceDim,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'End-to-end encrypted',
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: AppColors.gray500,
+                      color: context.csd.onSurfaceDim,
                     ),
                   ),
                 ],
@@ -1042,11 +1042,11 @@ class _MessageDetailSheet extends StatelessWidget {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: AppColors.gray200,
+                  backgroundColor: context.csd.avatarBg,
                   child: Text(
                     (message.sender?.displayName ?? 'U')[0].toUpperCase(),
-                    style: const TextStyle(
-                      color: AppColors.black,
+                    style: TextStyle(
+                      color: context.csd.onSurface,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

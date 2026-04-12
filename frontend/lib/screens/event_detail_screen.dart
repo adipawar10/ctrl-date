@@ -255,7 +255,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 Text(
                   '${DateFormat('HH:mm').format(startTime)} - ${DateFormat('HH:mm').format(endTime)}',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.gray600,
+                    color: context.csd.onSurfaceDim,
                   ),
                 ),
               ],
@@ -355,7 +355,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: AppColors.gray600),
+        Icon(icon, size: 20, color: context.csd.iconDefault),
         const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
@@ -685,14 +685,14 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 Text(
                   'Share this link to invite others to this event:',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.gray600,
+                    color: context.csd.onSurfaceDim,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
-                    color: AppColors.gray100,
+                    color: context.csd.surfaceAlt,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -908,7 +908,7 @@ class _ShareEventSheetState extends ConsumerState<_ShareEventSheet> {
             Text(
               widget.eventTitle,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.gray600,
+                color: context.csd.onSurfaceDim,
               ),
             ),
             const SizedBox(height: AppSpacing.md),

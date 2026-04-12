@@ -404,7 +404,7 @@ Generate {request.max_suggestions} scheduling suggestions to improve productivit
         "context_hash": context_hash,
         "date_range_start": request.start_date.isoformat(),
         "date_range_end": request.end_date.isoformat(),
-        "suggestions": [s.model_dump(by_alias=True) for s in validated],
+        "suggestions": [s.model_dump(by_alias=True, mode="json") for s in validated],
     }).execute()
 
     # Return response with camelCase aliases

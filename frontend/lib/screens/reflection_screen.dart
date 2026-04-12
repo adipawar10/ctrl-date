@@ -271,9 +271,9 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
       margin: const EdgeInsets.all(AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.gray100,
+        color: context.csd.surfaceAlt,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.gray200),
+        border: Border.all(color: context.csd.borderLight),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,7 +287,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                 decoration: BoxDecoration(
                   color: _productivityStreak > 0
                       ? AppColors.warning.withValues(alpha: 0.1)
-                      : AppColors.gray200,
+                      : context.csd.avatarBg,
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: Row(
@@ -308,8 +308,8 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: _productivityStreak > 0
-                            ? AppColors.black
-                            : AppColors.gray500,
+                            ? context.csd.onSurface
+                            : context.csd.onSurfaceDim,
                       ),
                     ),
                   ],
@@ -332,7 +332,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                     Text(
                       StreakService.getStreakMessage(_productivityStreak),
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.gray600,
+                        color: context.csd.onSurfaceDim,
                       ),
                     ),
                   ],
@@ -352,7 +352,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                   Text(
                     'Today',
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: AppColors.gray500,
+                      color: context.csd.onSurfaceDim,
                     ),
                   ),
                 ],
@@ -371,7 +371,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(AppSpacing.sm),
             decoration: BoxDecoration(
-              color: AppColors.white,
+              color: context.csd.surface,
               borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
             child: Row(
@@ -386,7 +386,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                   child: Text(
                     _supportiveMessage,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: AppColors.gray700,
+                      color: context.csd.onSurfaceAlt,
                     ),
                   ),
                 ),
@@ -409,7 +409,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
     if (_completionRate >= 1.0) return AppColors.completed;
     if (_completionRate >= 0.7) return AppColors.completed;
     if (_completionRate >= 0.5) return AppColors.partial;
-    return AppColors.gray600;
+    return context.csd.onSurfaceDim;
   }
 
   Widget _buildStatsSection(BuildContext context) {
@@ -426,7 +426,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.gray200),
+        border: Border.all(color: context.csd.borderLight),
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
@@ -518,7 +518,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
       margin: const EdgeInsets.all(AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.gray200),
+        border: Border.all(color: context.csd.borderLight),
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
@@ -550,7 +550,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? AppColors.getMoodColor(mood)
-                            : AppColors.gray100,
+                            : context.csd.surfaceAlt,
                         shape: BoxShape.circle,
                         border: isSelected
                             ? Border.all(
@@ -570,7 +570,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                     Text(
                       _getMoodLabel(mood),
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: isSelected ? AppColors.black : AppColors.gray500,
+                        color: isSelected ? context.csd.onSurface : context.csd.onSurfaceDim,
                         fontWeight: isSelected ? FontWeight.w600 : null,
                       ),
                     ),
@@ -658,7 +658,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.gray200),
+        border: Border.all(color: context.csd.borderLight),
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
@@ -677,9 +677,9 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
           // Status buttons
           Container(
             padding: const EdgeInsets.all(AppSpacing.sm),
-            decoration: const BoxDecoration(
-              color: AppColors.gray100,
-              borderRadius: BorderRadius.only(
+            decoration: BoxDecoration(
+              color: context.csd.surfaceAlt,
+              borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(AppRadius.md),
                 bottomRight: Radius.circular(AppRadius.md),
               ),
@@ -689,7 +689,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                 Text(
                   'Mark as:',
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: AppColors.gray600,
+                    color: context.csd.onSurfaceDim,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
@@ -750,10 +750,10 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
             vertical: AppSpacing.xs,
           ),
           decoration: BoxDecoration(
-            color: isSelected ? color.withValues(alpha: 0.15) : AppColors.white,
+            color: isSelected ? color.withValues(alpha: 0.15) : context.csd.surface,
             borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
-              color: isSelected ? color : AppColors.gray300,
+              color: isSelected ? color : context.csd.border,
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -763,14 +763,14 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
               Icon(
                 icon,
                 size: 16,
-                color: isSelected ? color : AppColors.gray500,
+                color: isSelected ? color : context.csd.onSurfaceDim,
               ),
               const SizedBox(width: 2),
               Flexible(
                 child: Text(
                   label,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: isSelected ? color : AppColors.gray600,
+                    color: isSelected ? color : context.csd.onSurfaceDim,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -875,7 +875,7 @@ class _ReflectionHistorySheet extends ConsumerWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: AppColors.gray300,
+              color: context.csd.border,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -969,19 +969,19 @@ class _ReflectionHistorySheet extends ConsumerWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.history, size: 64, color: AppColors.gray300),
+                      Icon(Icons.history, size: 64, color: context.csd.border),
                       const SizedBox(height: AppSpacing.md),
                       Text(
                         'No reflections yet',
                         style: theme.textTheme.titleMedium?.copyWith(
-                          color: AppColors.gray500,
+                          color: context.csd.onSurfaceDim,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
                         'Complete today\'s reflection to get started',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppColors.gray400,
+                          color: context.csd.onSurfaceDim,
                         ),
                       ),
                     ],
@@ -1005,7 +1005,7 @@ class _ReflectionHistorySheet extends ConsumerWidget {
                       decoration: BoxDecoration(
                         color: r.mood != null
                             ? AppColors.getMoodColor(r.mood!.value)
-                            : AppColors.gray100,
+                            : context.csd.surfaceAlt,
                         borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
                       child: Center(
@@ -1029,14 +1029,14 @@ class _ReflectionHistorySheet extends ConsumerWidget {
                           Text(
                             'Productivity: ${r.productivity!.label}',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: AppColors.gray600,
+                              color: context.csd.onSurfaceDim,
                             ),
                           ),
                         if (r.productivity != null && r.notes != null)
                           Text(
                             ' · ',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: AppColors.gray400,
+                              color: context.csd.onSurfaceDim,
                             ),
                           ),
                         if (r.notes != null)
@@ -1044,7 +1044,7 @@ class _ReflectionHistorySheet extends ConsumerWidget {
                             child: Text(
                               r.notes!,
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: AppColors.gray500,
+                                color: context.csd.onSurfaceDim,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1110,12 +1110,12 @@ class _StatChip extends StatelessWidget {
           vertical: AppSpacing.xs,
         ),
         decoration: BoxDecoration(
-          color: AppColors.gray100,
+          color: context.csd.surfaceAlt,
           borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Column(
           children: [
-            Icon(icon, size: 16, color: AppColors.gray600),
+            Icon(icon, size: 16, color: context.csd.iconDefault),
             const SizedBox(height: 2),
             Text(
               value,
@@ -1126,7 +1126,7 @@ class _StatChip extends StatelessWidget {
             Text(
               label,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.gray500,
+                color: context.csd.onSurfaceDim,
                 fontSize: 10,
               ),
             ),

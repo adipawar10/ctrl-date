@@ -58,6 +58,17 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  /// Delete all data from all tables (for account deletion / logout)
+  Future<void> deleteEverything() async {
+    await transaction(() async {
+      await customStatement('PRAGMA foreign_keys = OFF');
+      for (final table in allTables) {
+        await delete(table).go();
+      }
+      await customStatement('PRAGMA foreign_keys = ON');
+    });
+  }
+
   // Event operations
   Future<List<models.Event>> getAllEvents() async {
     final rows = await select(events).get();

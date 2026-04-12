@@ -126,7 +126,7 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
                                 child: Text(
                                   'All suggestions reviewed!',
                                   style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: AppColors.gray500,
+                                    color: context.csd.onSurfaceDim,
                                   ),
                                 ),
                               ),
@@ -150,9 +150,9 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.gray100,
+        color: context.csd.surfaceAlt,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.gray200),
+        border: Border.all(color: context.csd.borderLight),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,13 +183,13 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
               padding: const EdgeInsets.only(top: AppSpacing.xs),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 14, color: AppColors.gray500),
+                  Icon(Icons.info_outline, size: 14, color: context.csd.onSurfaceDim),
                   const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
                       gap,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.gray600,
+                        color: context.csd.onSurfaceDim,
                       ),
                     ),
                   ),
@@ -214,8 +214,8 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.gray200),
+        color: context.csd.surface,
+        border: Border.all(color: context.csd.borderLight),
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
@@ -241,13 +241,13 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
                   vertical: AppSpacing.xs,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.gray100,
+                  color: context.csd.chipBg,
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 child: Text(
                   suggestion.formattedDuration,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.gray700,
+                    color: context.csd.onSurfaceAlt,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -256,13 +256,13 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
               const SizedBox(width: AppSpacing.sm),
 
               // Time window
-              const Icon(Icons.access_time, size: 16, color: AppColors.gray600),
+              Icon(Icons.access_time, size: 16, color: context.csd.iconDefault),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   '$dateString, $timeWindow',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.gray600,
+                    color: context.csd.onSurfaceDim,
                   ),
                 ),
               ),
@@ -275,16 +275,16 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
           Container(
             padding: const EdgeInsets.all(AppSpacing.sm),
             decoration: BoxDecoration(
-              color: AppColors.gray100,
+              color: context.csd.surfaceAlt,
               borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
+                Icon(
                   Icons.lightbulb_outline,
                   size: 16,
-                  color: AppColors.gray600,
+                  color: context.csd.iconDefault,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -345,7 +345,7 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
             Text(
               'Your schedule looks great! Check back later for optimization ideas.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.gray600,
+                color: context.csd.onSurfaceDim,
               ),
               textAlign: TextAlign.center,
             ),
@@ -378,7 +378,7 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
             Text(
               'Please check your connection and try again.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.gray600,
+                color: context.csd.onSurfaceDim,
               ),
               textAlign: TextAlign.center,
             ),
@@ -554,7 +554,7 @@ class _AnalysisStat extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.gray500,
+              color: context.csd.onSurfaceDim,
             ),
           ),
         ],

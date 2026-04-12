@@ -23,6 +23,7 @@ class LockedBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final csd = context.csd;
     final tooltipMessage = tooltip ?? 'Locked - cannot be moved or modified';
 
     if (compact) {
@@ -31,7 +32,7 @@ class LockedBadge extends StatelessWidget {
         child: Icon(
           Icons.lock,
           size: 14,
-          color: AppColors.gray500,
+          color: csd.onSurfaceDim,
         ),
       );
     }
@@ -44,9 +45,9 @@ class LockedBadge extends StatelessWidget {
           vertical: AppSpacing.xs,
         ),
         decoration: BoxDecoration(
-          color: AppColors.gray100,
+          color: csd.surfaceAlt,
           borderRadius: BorderRadius.circular(AppRadius.full),
-          border: Border.all(color: AppColors.gray200),
+          border: Border.all(color: csd.borderLight),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -54,13 +55,13 @@ class LockedBadge extends StatelessWidget {
             Icon(
               Icons.lock,
               size: 12,
-              color: AppColors.gray600,
+              color: csd.onSurfaceDim,
             ),
             const SizedBox(width: 4),
             Text(
               'Locked',
               style: theme.textTheme.labelSmall?.copyWith(
-                color: AppColors.gray600,
+                color: csd.onSurfaceDim,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -92,6 +93,7 @@ class LockToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final csd = context.csd;
 
     return GestureDetector(
       onTap: enabled ? () => onChanged?.call(!isLocked) : null,
@@ -100,10 +102,10 @@ class LockToggle extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: isLocked ? AppColors.gray200 : AppColors.white,
+            color: isLocked ? csd.borderLight : csd.surface,
             borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(
-              color: isLocked ? AppColors.gray400 : AppColors.gray200,
+              color: isLocked ? csd.iconDefault : csd.borderLight,
               width: isLocked ? 2 : 1,
             ),
           ),
@@ -114,14 +116,14 @@ class LockToggle extends StatelessWidget {
                 height: 40,
                 decoration: BoxDecoration(
                   color: isLocked
-                      ? AppColors.gray400.withValues(alpha: 0.2)
-                      : AppColors.gray100,
+                      ? csd.iconDefault.withValues(alpha: 0.2)
+                      : csd.surfaceAlt,
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 child: Icon(
                   isLocked ? Icons.lock : Icons.lock_open,
                   size: 20,
-                  color: isLocked ? AppColors.gray700 : AppColors.gray400,
+                  color: isLocked ? csd.iconDefault : csd.iconDefault,
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
@@ -138,7 +140,7 @@ class LockToggle extends StatelessWidget {
                           ? 'AI cannot reschedule this event'
                           : 'Tap to prevent AI from moving this event',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.gray600,
+                        color: csd.onSurfaceDim,
                       ),
                     ),
                   ],
@@ -169,18 +171,19 @@ class LockStatusIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!isLocked) return const SizedBox.shrink();
 
+    final csd = context.csd;
     return Tooltip(
       message: 'Locked event',
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: AppColors.gray100,
+          color: csd.surfaceAlt,
           borderRadius: BorderRadius.circular(4),
         ),
         child: Icon(
           Icons.lock,
           size: 12,
-          color: AppColors.gray500,
+          color: csd.onSurfaceDim,
         ),
       ),
     );
@@ -207,7 +210,7 @@ class InlineLockIndicator extends StatelessWidget {
       child: Icon(
         Icons.lock,
         size: size,
-        color: AppColors.gray400,
+        color: context.csd.iconDefault,
       ),
     );
   }

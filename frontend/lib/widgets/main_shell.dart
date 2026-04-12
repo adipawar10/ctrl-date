@@ -25,7 +25,7 @@ class MainShell extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(
             top: BorderSide(
-              color: AppColors.gray200,
+              color: context.csd.borderLight,
               width: 1,
             ),
           ),

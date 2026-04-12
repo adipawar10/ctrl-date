@@ -60,8 +60,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   if (user == null) {
                     return ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: AppColors.gray200,
-                        child: const Icon(Icons.person, color: AppColors.black),
+                        backgroundColor: context.csd.avatarBg,
+                        child: Icon(Icons.person, color: context.csd.onSurface),
                       ),
                       title: const Text('Not signed in'),
                       subtitle: const Text('Tap to sign in'),
@@ -71,12 +71,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   }
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: AppColors.gray200,
+                      backgroundColor: context.csd.avatarBg,
                       backgroundImage: user.avatarUrl != null
                           ? NetworkImage(user.avatarUrl!)
                           : null,
                       child: user.avatarUrl == null
-                          ? const Icon(Icons.person, color: AppColors.black)
+                          ? Icon(Icons.person, color: context.csd.onSurface)
                           : null,
                     ),
                     title: Text(user.displayName ?? user.email),
@@ -85,17 +85,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     onTap: _editProfile,
                   );
                 },
-                loading: () => const ListTile(
+                loading: () => ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: AppColors.gray200,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    backgroundColor: context.csd.avatarBg,
+                    child: const CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  title: Text('Loading...'),
+                  title: const Text('Loading...'),
                 ),
                 error: (_, __) => ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: AppColors.gray200,
-                    child: const Icon(Icons.person, color: AppColors.black),
+                    backgroundColor: context.csd.avatarBg,
+                    child: Icon(Icons.person, color: context.csd.onSurface),
                   ),
                   title: const Text('Not signed in'),
                   subtitle: const Text('Tap to sign in'),
@@ -335,7 +335,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: AppColors.gray600,
+              color: context.csd.onSurfaceDim,
             ),
       ),
     );
@@ -521,11 +521,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             color: color,
                             shape: BoxShape.circle,
                             border: isSelected
-                                ? Border.all(color: AppColors.black, width: 3)
+                                ? Border.all(color: context.csd.onSurface, width: 3)
                                 : null,
                           ),
                           child: isSelected
-                              ? const Icon(Icons.check, color: AppColors.white)
+                              ? Icon(Icons.check, color: context.csd.surface)
                               : null,
                         ),
                       );
@@ -540,7 +540,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               decoration: BoxDecoration(
                 color: currentColor,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.gray300),
+                border: Border.all(color: context.csd.border),
               ),
             ),
           ),
@@ -831,7 +831,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               Text(
                 'Import events from a CSV or ICS file',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.gray600,
+                  color: context.csd.onSurfaceDim,
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -1143,12 +1143,12 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                           final user = ref.watch(currentUserProvider).valueOrNull;
                           return CircleAvatar(
                             radius: 48,
-                            backgroundColor: AppColors.gray200,
+                            backgroundColor: context.csd.avatarBg,
                             backgroundImage: user?.avatarUrl != null
                                 ? NetworkImage(user!.avatarUrl!)
                                 : null,
                             child: user?.avatarUrl == null
-                                ? const Icon(Icons.person, size: 48, color: AppColors.black)
+                                ? Icon(Icons.person, size: 48, color: context.csd.onSurface)
                                 : null,
                           );
                         },
@@ -1160,11 +1160,11 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                           width: 32,
                           height: 32,
                           decoration: BoxDecoration(
-                            color: AppColors.black,
+                            color: context.csd.onSurface,
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.white, width: 2),
+                            border: Border.all(color: context.csd.surface, width: 2),
                           ),
-                          child: const Icon(Icons.camera_alt, color: AppColors.white, size: 14),
+                          child: Icon(Icons.camera_alt, color: context.csd.surface, size: 14),
                         ),
                       ),
                     ],

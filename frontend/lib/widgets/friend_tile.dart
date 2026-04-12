@@ -70,7 +70,7 @@ class FriendTile extends StatelessWidget {
       subtitle: Text(
         _getSubtitle(),
         style: theme.textTheme.bodySmall?.copyWith(
-          color: isOnline ? AppColors.completed : AppColors.gray500,
+          color: isOnline ? AppColors.completed : context.csd.onSurfaceDim,
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -95,11 +95,12 @@ class FriendTile extends StatelessWidget {
   }
 
   Widget _buildAvatar(BuildContext context) {
+    final csd = context.csd;
     return Stack(
       children: [
         CircleAvatar(
           radius: 24,
-          backgroundColor: AppColors.gray200,
+          backgroundColor: csd.avatarBg,
           backgroundImage:
               avatarUrl != null ? NetworkImage(avatarUrl!) : null,
           child: avatarUrl == null
@@ -107,8 +108,8 @@ class FriendTile extends StatelessWidget {
                   displayName.isNotEmpty
                       ? displayName[0].toUpperCase()
                       : '?',
-                  style: const TextStyle(
-                    color: AppColors.black,
+                  style: TextStyle(
+                    color: csd.onSurface,
                     fontWeight: FontWeight.w600,
                     fontSize: 18,
                   ),
@@ -126,7 +127,7 @@ class FriendTile extends StatelessWidget {
                 color: AppColors.completed,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: AppColors.white,
+                  color: csd.surface,
                   width: 2,
                 ),
               ),
@@ -175,16 +176,17 @@ class CompactFriendTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final csd = context.csd;
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.sm),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.gray200 : AppColors.white,
+          color: isSelected ? csd.borderLight : csd.surface,
           borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(
-            color: isSelected ? AppColors.black : AppColors.gray200,
+            color: isSelected ? csd.onSurface : csd.borderLight,
           ),
         ),
         child: Row(
@@ -194,7 +196,7 @@ class CompactFriendTile extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 16,
-                  backgroundColor: AppColors.gray200,
+                  backgroundColor: csd.avatarBg,
                   backgroundImage:
                       avatarUrl != null ? NetworkImage(avatarUrl!) : null,
                   child: avatarUrl == null
@@ -202,8 +204,8 @@ class CompactFriendTile extends StatelessWidget {
                           displayName.isNotEmpty
                               ? displayName[0].toUpperCase()
                               : '?',
-                          style: const TextStyle(
-                            color: AppColors.black,
+                          style: TextStyle(
+                            color: csd.onSurface,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
                           ),
@@ -221,7 +223,7 @@ class CompactFriendTile extends StatelessWidget {
                         color: AppColors.completed,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: AppColors.white,
+                          color: csd.surface,
                           width: 2,
                         ),
                       ),
@@ -279,11 +281,12 @@ class FriendRequestTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final csd = context.csd;
 
     return ListTile(
       leading: CircleAvatar(
         radius: 24,
-        backgroundColor: AppColors.gray200,
+        backgroundColor: csd.avatarBg,
         backgroundImage:
             avatarUrl != null ? NetworkImage(avatarUrl!) : null,
         child: avatarUrl == null
@@ -291,8 +294,8 @@ class FriendRequestTile extends StatelessWidget {
                 displayName.isNotEmpty
                     ? displayName[0].toUpperCase()
                     : '?',
-                style: const TextStyle(
-                  color: AppColors.black,
+                style: TextStyle(
+                  color: csd.onSurface,
                   fontWeight: FontWeight.w600,
                   fontSize: 18,
                 ),
@@ -319,7 +322,7 @@ class FriendRequestTile extends StatelessWidget {
                   icon: const Icon(Icons.close),
                   onPressed: onDecline,
                   tooltip: 'Decline',
-                  color: AppColors.gray600,
+                  color: csd.onSurfaceDim,
                 ),
                 IconButton(
                   icon: const Icon(Icons.check),

@@ -44,7 +44,7 @@ class ProgressIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final clampedValue = value.clamp(0.0, 1.0);
-    final effectiveBackgroundColor = backgroundColor ?? AppColors.gray200;
+    final effectiveBackgroundColor = backgroundColor ?? context.csd.borderLight;
     final effectiveProgressColor = progressColor ?? _getProgressColor(clampedValue);
 
     if (showLabel) {
@@ -164,7 +164,7 @@ class CircularProgressIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final clampedValue = value.clamp(0.0, 1.0);
-    final effectiveBackgroundColor = backgroundColor ?? AppColors.gray200;
+    final effectiveBackgroundColor = backgroundColor ?? context.csd.borderLight;
     final effectiveProgressColor = progressColor ?? _getProgressColor(clampedValue);
 
     return SizedBox(
@@ -303,8 +303,8 @@ class SegmentedProgressIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveCompletedColor = completedColor ?? AppColors.black;
-    final effectiveIncompleteColor = incompleteColor ?? AppColors.gray200;
+    final effectiveCompletedColor = completedColor ?? context.csd.onSurface;
+    final effectiveIncompleteColor = incompleteColor ?? context.csd.borderLight;
 
     return Row(
       children: List.generate(total, (index) {

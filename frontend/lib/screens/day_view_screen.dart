@@ -165,7 +165,7 @@ class _DayViewScreenState extends ConsumerState<DayViewScreen> {
           ? AppColors.completed.withValues(alpha: 0.05)
           : score >= 40
               ? AppColors.partial.withValues(alpha: 0.05)
-              : AppColors.gray100,
+              : context.csd.surfaceAlt,
       child: Row(
         children: [
           Text(
@@ -176,7 +176,7 @@ class _DayViewScreenState extends ConsumerState<DayViewScreen> {
                   ? AppColors.completed
                   : score >= 40
                       ? AppColors.partial
-                      : AppColors.gray600,
+                      : context.csd.onSurfaceDim,
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -185,12 +185,12 @@ class _DayViewScreenState extends ConsumerState<DayViewScreen> {
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
                 value: score / 100,
-                backgroundColor: AppColors.gray200,
+                backgroundColor: context.csd.borderLight,
                 color: score >= 70
                     ? AppColors.completed
                     : score >= 40
                         ? AppColors.partial
-                        : AppColors.gray400,
+                        : context.csd.onSurfaceAlt,
                 minHeight: 6,
               ),
             ),
@@ -199,7 +199,7 @@ class _DayViewScreenState extends ConsumerState<DayViewScreen> {
           Text(
             '$completed✓ $partial~ $skipped✗',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: AppColors.gray600,
+              color: context.csd.onSurfaceDim,
             ),
           ),
         ],
@@ -379,7 +379,7 @@ class _DayViewScreenState extends ConsumerState<DayViewScreen> {
               Text(
                 'Mark this event as:',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppColors.gray600,
+                  color: context.csd.onSurfaceDim,
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -417,7 +417,7 @@ class _DayViewScreenState extends ConsumerState<DayViewScreen> {
                 _StatusOption(
                   icon: Icons.schedule,
                   label: 'Reset to Scheduled',
-                  color: AppColors.gray600,
+                  color: context.csd.onSurfaceDim,
                   isSelected: false,
                   onTap: () {
                     Navigator.pop(context);
@@ -498,7 +498,7 @@ class _StatusOption extends StatelessWidget {
     return ListTile(
       leading: Icon(
         icon,
-        color: isSelected ? color : AppColors.gray500,
+        color: isSelected ? color : context.csd.onSurfaceDim,
       ),
       title: Text(
         label,

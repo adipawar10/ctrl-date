@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
+import '../main.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
@@ -275,14 +277,31 @@ class AuthActions {
       final response = await api.delete('/auth/account');
 
       // Clear all local data regardless of server response
-      await _encryptionService.clearKeys();
+      await _clearAllLocalData();
 
       // Sign out
       return _authService.signOut();
     } catch (e) {
       // Still clear local data even if server call fails
-      await _encryptionService.clearKeys();
+      await _clearAllLocalData();
       return _authService.signOut();
+    }
+  }
+
+  /// Clear all local data (encryption keys, preferences, local DB)
+  Future<void> _clearAllLocalData() async {
+    await _encryptionService.clearKeys();
+
+    // Clear SharedPreferences so onboarding is required again
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+
+    // Clear local Drift database
+    try {
+      final database = _ref.read(databaseProvider);
+      await database.deleteEverything();
+    } catch (_) {
+      // Database may not be available
     }
   }
 }

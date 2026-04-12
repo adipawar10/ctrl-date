@@ -270,14 +270,14 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                   decoration: BoxDecoration(
-                    color: isToday ? AppColors.gray100 : null,
+                    color: isToday ? context.csd.surfaceAlt : null,
                   ),
                   child: Column(
                     children: [
                       Text(
                         DateFormat('E').format(day),
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: isToday ? AppColors.black : AppColors.gray600,
+                          color: isToday ? context.csd.onSurface : context.csd.onSurfaceDim,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -285,14 +285,14 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color: isToday ? AppColors.black : null,
+                          color: isToday ? context.csd.onSurface : null,
                           shape: BoxShape.circle,
                         ),
                         alignment: Alignment.center,
                         child: Text(
                           '${day.day}',
                           style: theme.textTheme.titleSmall?.copyWith(
-                            color: isToday ? AppColors.white : AppColors.black,
+                            color: isToday ? context.csd.surface : context.csd.onSurface,
                             fontWeight:
                                 isToday ? FontWeight.w700 : FontWeight.w500,
                           ),
@@ -357,7 +357,7 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
                 return Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: isToday ? AppColors.gray100.withValues(alpha: 0.5) : null,
+                      color: isToday ? context.csd.surfaceAlt.withValues(alpha: 0.5) : null,
                       border: Border(
                         left: BorderSide(
                           color: theme.colorScheme.outlineVariant,
@@ -426,8 +426,8 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
           padding: const EdgeInsets.all(4),
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
-            color: AppColors.white,
-            border: Border.all(color: AppColors.gray300),
+            color: context.csd.surface,
+            border: Border.all(color: context.csd.border),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Column(
@@ -449,7 +449,7 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
                     Icon(
                       Icons.lock,
                       size: 10,
-                      color: AppColors.gray600,
+                      color: context.csd.iconDefault,
                     ),
                   ],
                   const SizedBox(width: 4),
@@ -459,7 +459,7 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
-                        color: AppColors.black,
+                        color: context.csd.onSurface,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

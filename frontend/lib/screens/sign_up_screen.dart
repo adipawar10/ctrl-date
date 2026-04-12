@@ -43,7 +43,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: context.csd.surface,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -73,7 +73,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 Text(
                   'Sign up to start planning smarter',
                   style: theme.textTheme.bodyLarge?.copyWith(
-                    color: AppColors.gray600,
+                    color: context.csd.onSurfaceDim,
                   ),
                 ),
 
@@ -231,7 +231,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
-                    color: AppColors.gray100,
+                    color: context.csd.surfaceAlt,
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: Column(
@@ -276,7 +276,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     Text(
                       'Already have an account? ',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppColors.gray600,
+                        color: context.csd.onSurfaceDim,
                       ),
                     ),
                     TextButton(
@@ -359,10 +359,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.mark_email_unread_outlined,
               size: 48,
-              color: AppColors.black,
+              color: context.csd.onSurface,
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
@@ -405,13 +405,13 @@ class _PasswordRequirement extends StatelessWidget {
         Icon(
           isMet ? Icons.check_circle : Icons.circle_outlined,
           size: 16,
-          color: isMet ? AppColors.success : AppColors.gray500,
+          color: isMet ? AppColors.success : context.csd.onSurfaceDim,
         ),
         const SizedBox(width: AppSpacing.sm),
         Text(
           text,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: isMet ? AppColors.success : AppColors.gray600,
+            color: isMet ? AppColors.success : context.csd.onSurfaceDim,
           ),
         ),
       ],

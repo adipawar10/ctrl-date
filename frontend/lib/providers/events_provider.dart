@@ -147,8 +147,42 @@ class EventsNotifier extends StateNotifier<AsyncValue<List<Event>>> {
       // Save to local database
       await _database.insertEvent(event);
 
+      // Convert to snake_case format for the backend API
+      final priorityInt = switch (event.priority) {
+        EventPriority.low => 1,
+        EventPriority.medium => 2,
+        EventPriority.high => 3,
+        EventPriority.urgent => 4,
+      };
+
+      final body = <String, dynamic>{
+        'title': event.title,
+        'description': event.description,
+        'location': event.location,
+        'start_time': event.startTime.toIso8601String(),
+        'end_time': event.endTime.toIso8601String(),
+        'all_day': event.isAllDay,
+        'timezone': DateTime.now().timeZoneName,
+        'is_locked': false,
+        'priority': priorityInt,
+        'color': event.color,
+        'tags': event.tags,
+      };
+
+      if (event.recurrenceRule != null) {
+        body['recurrence_rule'] = {
+          'frequency': event.recurrenceRule!.frequency.name,
+          'interval': event.recurrenceRule!.interval,
+          'by_week_day': event.recurrenceRule!.byWeekDay,
+          'by_month_day': event.recurrenceRule!.byMonthDay,
+          'by_month': event.recurrenceRule!.byMonth,
+          'count': event.recurrenceRule!.count,
+          'until': event.recurrenceRule!.until?.toIso8601String(),
+        };
+      }
+
       // Sync to server
-      final response = await _api.post('/events', body: event.toJson());
+      final response = await _api.post('/events', body: body);
 
       if (response.isSuccess) {
         await _database.markEventSynced(event.id);
@@ -170,10 +204,31 @@ class EventsNotifier extends StateNotifier<AsyncValue<List<Event>>> {
 
       await _database.updateEvent(updatedEvent);
 
+      // Convert to snake_case format for the backend API
+      final priorityInt = switch (updatedEvent.priority) {
+        EventPriority.low => 1,
+        EventPriority.medium => 2,
+        EventPriority.high => 3,
+        EventPriority.urgent => 4,
+      };
+
+      final body = <String, dynamic>{
+        'title': updatedEvent.title,
+        'description': updatedEvent.description,
+        'location': updatedEvent.location,
+        'start_time': updatedEvent.startTime.toIso8601String(),
+        'end_time': updatedEvent.endTime.toIso8601String(),
+        'all_day': updatedEvent.isAllDay,
+        'is_locked': false,
+        'priority': priorityInt,
+        'color': updatedEvent.color,
+        'tags': updatedEvent.tags,
+      };
+
       // Sync to server
       final response = await _api.put(
         '/events/${event.id}',
-        body: updatedEvent.toJson(),
+        body: body,
       );
 
       if (response.isSuccess) {

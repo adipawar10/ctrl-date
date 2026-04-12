@@ -43,10 +43,10 @@ class StreakBadge extends StatelessWidget {
           vertical: AppSpacing.xs,
         ),
         decoration: BoxDecoration(
-          color: _getBackgroundColor(),
+          color: _getBackgroundColor(context),
           borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(
-            color: _getBorderColor(),
+            color: _getBorderColor(context),
           ),
         ),
         child: Row(
@@ -55,14 +55,14 @@ class StreakBadge extends StatelessWidget {
             Icon(
               _getIcon(),
               size: 16,
-              color: _getIconColor(),
+              color: _getIconColor(context),
             ),
             const SizedBox(width: 4),
             Text(
               '$count',
               style: theme.textTheme.labelMedium?.copyWith(
                 fontWeight: FontWeight.w700,
-                color: _getTextColor(),
+                color: _getTextColor(context),
               ),
             ),
           ],
@@ -80,14 +80,14 @@ class StreakBadge extends StatelessWidget {
         Icon(
           _getIcon(),
           size: 14,
-          color: _getIconColor(),
+          color: _getIconColor(context),
         ),
         const SizedBox(width: 2),
         Text(
           '$count',
           style: theme.textTheme.labelSmall?.copyWith(
             fontWeight: FontWeight.w700,
-            color: _getTextColor(),
+            color: _getTextColor(context),
           ),
         ),
       ],
@@ -100,30 +100,34 @@ class StreakBadge extends StatelessWidget {
     return Icons.local_fire_department;
   }
 
-  Color _getBackgroundColor() {
-    if (count == 0) return AppColors.gray100;
+  Color _getBackgroundColor(BuildContext context) {
+    final csd = context.csd;
+    if (count == 0) return csd.surfaceAlt;
     if (count >= 30) return AppColors.warning.withValues(alpha: 0.15);
     if (count >= 7) return AppColors.completed.withValues(alpha: 0.1);
-    return AppColors.gray100;
+    return csd.surfaceAlt;
   }
 
-  Color _getBorderColor() {
-    if (count == 0) return AppColors.gray200;
+  Color _getBorderColor(BuildContext context) {
+    final csd = context.csd;
+    if (count == 0) return csd.borderLight;
     if (count >= 30) return AppColors.warning.withValues(alpha: 0.3);
     if (count >= 7) return AppColors.completed.withValues(alpha: 0.3);
-    return AppColors.gray200;
+    return csd.borderLight;
   }
 
-  Color _getIconColor() {
-    if (count == 0) return AppColors.gray400;
+  Color _getIconColor(BuildContext context) {
+    final csd = context.csd;
+    if (count == 0) return csd.iconDefault;
     if (count >= 30) return AppColors.warning;
     if (count >= 7) return AppColors.completed;
-    return AppColors.gray600;
+    return csd.onSurfaceDim;
   }
 
-  Color _getTextColor() {
-    if (count == 0) return AppColors.gray500;
-    return AppColors.black;
+  Color _getTextColor(BuildContext context) {
+    final csd = context.csd;
+    if (count == 0) return csd.onSurfaceDim;
+    return csd.onSurface;
   }
 }
 
@@ -148,11 +152,12 @@ class StreakDisplay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final csd = context.csd;
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.gray100,
+        color: csd.surfaceAlt,
         borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Column(
@@ -162,7 +167,7 @@ class StreakDisplay extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: _getStreakColor().withValues(alpha: 0.1),
+              color: _getStreakColor(context).withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -170,7 +175,7 @@ class StreakDisplay extends StatelessWidget {
                   ? Icons.whatshot
                   : Icons.local_fire_department,
               size: 32,
-              color: _getStreakColor(),
+              color: _getStreakColor(context),
             ),
           ),
 
@@ -181,13 +186,13 @@ class StreakDisplay extends StatelessWidget {
             '$currentStreak',
             style: theme.textTheme.displayLarge?.copyWith(
               fontWeight: FontWeight.w700,
-              color: AppColors.black,
+              color: csd.onSurface,
             ),
           ),
           Text(
             currentStreak == 1 ? 'day streak' : 'day streak',
             style: theme.textTheme.bodyLarge?.copyWith(
-              color: AppColors.gray600,
+              color: csd.onSurfaceDim,
             ),
           ),
 
@@ -235,13 +240,13 @@ class StreakDisplay extends StatelessWidget {
               Icon(
                 Icons.emoji_events,
                 size: 20,
-                color: AppColors.gray500,
+                color: csd.onSurfaceDim,
               ),
               const SizedBox(width: 8),
               Text(
                 'Longest streak: ',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppColors.gray600,
+                  color: csd.onSurfaceDim,
                 ),
               ),
               Text(
@@ -257,11 +262,12 @@ class StreakDisplay extends StatelessWidget {
     );
   }
 
-  Color _getStreakColor() {
-    if (currentStreak == 0) return AppColors.gray400;
+  Color _getStreakColor(BuildContext context) {
+    final csd = context.csd;
+    if (currentStreak == 0) return csd.iconDefault;
     if (currentStreak >= 30) return AppColors.warning;
     if (currentStreak >= 7) return AppColors.completed;
-    return AppColors.gray600;
+    return csd.onSurfaceDim;
   }
 }
 
@@ -279,18 +285,19 @@ class StreakMilestone extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final csd = context.csd;
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         color: achieved
             ? AppColors.completed.withValues(alpha: 0.1)
-            : AppColors.gray100,
+            : csd.surfaceAlt,
         borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(
           color: achieved
               ? AppColors.completed.withValues(alpha: 0.3)
-              : AppColors.gray200,
+              : csd.borderLight,
         ),
       ),
       child: Column(
@@ -298,20 +305,20 @@ class StreakMilestone extends StatelessWidget {
           Icon(
             achieved ? Icons.check_circle : Icons.circle_outlined,
             size: 24,
-            color: achieved ? AppColors.completed : AppColors.gray400,
+            color: achieved ? AppColors.completed : csd.iconDefault,
           ),
           const SizedBox(height: 4),
           Text(
             '$milestone',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              color: achieved ? AppColors.black : AppColors.gray500,
+              color: achieved ? csd.onSurface : csd.onSurfaceDim,
             ),
           ),
           Text(
             'days',
             style: theme.textTheme.labelSmall?.copyWith(
-              color: achieved ? AppColors.gray600 : AppColors.gray400,
+              color: achieved ? csd.onSurfaceDim : csd.iconDefault,
             ),
           ),
         ],

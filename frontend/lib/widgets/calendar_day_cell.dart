@@ -51,16 +51,17 @@ class CalendarDayCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final csd = context.csd;
 
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
       child: Container(
         decoration: BoxDecoration(
-          color: _getBackgroundColor(),
+          color: _getBackgroundColor(context),
           borderRadius: BorderRadius.circular(AppRadius.sm),
           border: isSelected
-              ? Border.all(color: AppColors.black, width: 2)
+              ? Border.all(color: csd.onSurface, width: 2)
               : null,
         ),
         child: Column(
@@ -71,7 +72,7 @@ class CalendarDayCell extends StatelessWidget {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: isToday ? AppColors.black : null,
+                color: isToday ? csd.onSurface : null,
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
@@ -82,7 +83,7 @@ class CalendarDayCell extends StatelessWidget {
                   fontWeight: isToday || isSelected
                       ? FontWeight.w700
                       : FontWeight.w500,
-                  color: _getTextColor(),
+                  color: _getTextColor(context),
                 ),
               ),
             ),
@@ -90,24 +91,26 @@ class CalendarDayCell extends StatelessWidget {
             const SizedBox(height: 2),
 
             // Event indicators
-            if (eventCount > 0) _buildEventIndicators(),
+            if (eventCount > 0) _buildEventIndicators(context),
           ],
         ),
       ),
     );
   }
 
-  Color _getBackgroundColor() {
-    if (isSelected) return AppColors.gray100;
-    if (!isCurrentMonth) return AppColors.gray100.withValues(alpha: 0.5);
+  Color _getBackgroundColor(BuildContext context) {
+    final csd = context.csd;
+    if (isSelected) return csd.surfaceAlt;
+    if (!isCurrentMonth) return csd.surfaceAlt.withValues(alpha: 0.5);
     return Colors.transparent;
   }
 
-  Color _getTextColor() {
-    if (isToday) return AppColors.white;
-    if (!isCurrentMonth) return AppColors.gray400;
-    if (_isWeekend()) return AppColors.gray500;
-    return AppColors.black;
+  Color _getTextColor(BuildContext context) {
+    final csd = context.csd;
+    if (isToday) return csd.surface;
+    if (!isCurrentMonth) return csd.onSurfaceDim;
+    if (_isWeekend()) return csd.onSurfaceDim;
+    return csd.onSurface;
   }
 
   bool _isWeekend() {
@@ -115,7 +118,8 @@ class CalendarDayCell extends StatelessWidget {
         date.weekday == DateTime.sunday;
   }
 
-  Widget _buildEventIndicators() {
+  Widget _buildEventIndicators(BuildContext context) {
+    final csd = context.csd;
     // Show up to 3 dots for events
     final dotCount = eventCount.clamp(0, 3);
 
@@ -143,8 +147,8 @@ class CalendarDayCell extends StatelessWidget {
               height: 4,
               decoration: BoxDecoration(
                 color: isCurrentMonth
-                    ? AppColors.gray400
-                    : AppColors.gray300,
+                    ? csd.onSurfaceDim
+                    : csd.border,
                 shape: BoxShape.circle,
               ),
             ),
@@ -158,8 +162,8 @@ class CalendarDayCell extends StatelessWidget {
               Icons.lock,
               size: 8,
               color: isCurrentMonth
-                  ? AppColors.gray500
-                  : AppColors.gray400,
+                  ? csd.onSurfaceDim
+                  : csd.iconDefault,
             ),
           ),
       ],
@@ -188,14 +192,16 @@ class CompactCalendarDayCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final csd = context.csd;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: isToday
-              ? AppColors.black
+              ? csd.onSurface
               : isSelected
-                  ? AppColors.gray200
+                  ? csd.borderLight
                   : null,
           shape: BoxShape.circle,
         ),
@@ -210,10 +216,10 @@ class CompactCalendarDayCell extends StatelessWidget {
                     ? FontWeight.w700
                     : FontWeight.w500,
                 color: isToday
-                    ? AppColors.white
+                    ? csd.surface
                     : isCurrentMonth
-                        ? AppColors.black
-                        : AppColors.gray400,
+                        ? csd.onSurface
+                        : csd.onSurfaceDim,
               ),
             ),
             if (hasEvents)
@@ -223,7 +229,7 @@ class CompactCalendarDayCell extends StatelessWidget {
                   width: 4,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: isToday ? AppColors.white : AppColors.black,
+                    color: isToday ? csd.surface : csd.onSurface,
                     shape: BoxShape.circle,
                   ),
                 ),

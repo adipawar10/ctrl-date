@@ -48,6 +48,7 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final csd = context.csd;
 
     final content = Dismissible(
       key: Key(id),
@@ -57,7 +58,7 @@ class MessageBubble extends StatelessWidget {
         color: AppColors.error,
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: AppSpacing.md),
-        child: const Icon(Icons.delete, color: AppColors.white),
+        child: Icon(Icons.delete, color: csd.surface),
       ),
       child: ListTile(
         onTap: onTap,
@@ -77,7 +78,7 @@ class MessageBubble extends StatelessWidget {
             Text(
               _formatTime(createdAt),
               style: theme.textTheme.labelSmall?.copyWith(
-                color: AppColors.gray500,
+                color: csd.onSurfaceDim,
               ),
             ),
           ],
@@ -92,7 +93,7 @@ class MessageBubble extends StatelessWidget {
               child: Text(
                 preview,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: isRead ? AppColors.gray500 : AppColors.gray700,
+                  color: isRead ? csd.onSurfaceDim : csd.onSurfaceAlt,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -103,8 +104,8 @@ class MessageBubble extends StatelessWidget {
               Container(
                 width: 8,
                 height: 8,
-                decoration: const BoxDecoration(
-                  color: AppColors.black,
+                decoration: BoxDecoration(
+                  color: csd.onSurface,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -118,6 +119,7 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildLeadingIcon(BuildContext context) {
+    final csd = context.csd;
     IconData icon;
     Color backgroundColor;
 
@@ -132,17 +134,17 @@ class MessageBubble extends StatelessWidget {
         break;
       case 'system':
         icon = Icons.info;
-        backgroundColor = AppColors.gray100;
+        backgroundColor = csd.surfaceAlt;
         break;
       default:
         // For text messages, show sender avatar
         return CircleAvatar(
           radius: 24,
-          backgroundColor: AppColors.gray200,
+          backgroundColor: csd.avatarBg,
           child: Text(
             senderName.isNotEmpty ? senderName[0].toUpperCase() : '?',
-            style: const TextStyle(
-              color: AppColors.black,
+            style: TextStyle(
+              color: csd.onSurface,
               fontWeight: FontWeight.w600,
               fontSize: 18,
             ),
@@ -156,7 +158,7 @@ class MessageBubble extends StatelessWidget {
       child: Icon(
         icon,
         size: 20,
-        color: AppColors.gray700,
+        color: csd.iconDefault,
       ),
     );
   }
@@ -224,6 +226,8 @@ class MessageView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final csd = context.csd;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -232,7 +236,7 @@ class MessageView extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 20,
-              backgroundColor: AppColors.gray200,
+              backgroundColor: csd.avatarBg,
               backgroundImage: senderAvatarUrl != null
                   ? NetworkImage(senderAvatarUrl!)
                   : null,
@@ -241,8 +245,8 @@ class MessageView extends StatelessWidget {
                       senderName.isNotEmpty
                           ? senderName[0].toUpperCase()
                           : '?',
-                      style: const TextStyle(
-                        color: AppColors.black,
+                      style: TextStyle(
+                        color: csd.onSurface,
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),
@@ -261,7 +265,7 @@ class MessageView extends StatelessWidget {
                   Text(
                     DateFormat('MMM d, yyyy at HH:mm').format(createdAt),
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: AppColors.gray500,
+                      color: csd.onSurfaceDim,
                     ),
                   ),
                 ],
@@ -290,12 +294,12 @@ class MessageView extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.lock, size: 12, color: AppColors.gray400),
+            Icon(Icons.lock, size: 12, color: csd.iconDefault),
             const SizedBox(width: 4),
             Text(
               'End-to-end encrypted',
               style: theme.textTheme.labelSmall?.copyWith(
-                color: AppColors.gray400,
+                color: csd.onSurfaceDim,
               ),
             ),
           ],
@@ -388,6 +392,7 @@ class ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final csd = context.csd;
 
     return Align(
       alignment: isFromMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -401,7 +406,7 @@ class ChatBubble extends StatelessWidget {
         ),
         padding: const EdgeInsets.all(AppSpacing.sm),
         decoration: BoxDecoration(
-          color: isFromMe ? AppColors.black : AppColors.gray100,
+          color: isFromMe ? csd.onSurface : csd.surfaceAlt,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(AppRadius.md),
             topRight: const Radius.circular(AppRadius.md),
@@ -415,7 +420,7 @@ class ChatBubble extends StatelessWidget {
             Text(
               content,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: isFromMe ? AppColors.white : AppColors.black,
+                color: isFromMe ? csd.surface : csd.onSurface,
               ),
             ),
             const SizedBox(height: 4),
@@ -426,8 +431,8 @@ class ChatBubble extends StatelessWidget {
                   DateFormat('HH:mm').format(timestamp),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: isFromMe
-                        ? AppColors.white.withValues(alpha: 0.7)
-                        : AppColors.gray500,
+                        ? csd.surface.withValues(alpha: 0.7)
+                        : csd.onSurfaceDim,
                   ),
                 ),
                 if (isFromMe) ...[
@@ -435,7 +440,7 @@ class ChatBubble extends StatelessWidget {
                   Icon(
                     isRead ? Icons.done_all : Icons.check,
                     size: 14,
-                    color: AppColors.white.withValues(alpha: 0.7),
+                    color: csd.surface.withValues(alpha: 0.7),
                   ),
                 ],
               ],

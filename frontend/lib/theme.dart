@@ -223,6 +223,76 @@ class AppRadius {
   static const double full = 999;
 }
 
+/// Theme-aware color helpers.
+///
+/// Use `context.csd` in any widget to get colors that adapt to light/dark mode.
+extension CsdColors on BuildContext {
+  _CsdColorSet get csd {
+    final brightness = Theme.of(this).brightness;
+    return brightness == Brightness.dark ? _CsdColorSet._dark : _CsdColorSet._light;
+  }
+}
+
+class _CsdColorSet {
+  final Color surface;          // screen / card background
+  final Color surfaceAlt;       // slightly contrasting container
+  final Color surfaceDim;       // cards, input fills
+  final Color onSurface;        // primary text / icons
+  final Color onSurfaceAlt;     // secondary text
+  final Color onSurfaceDim;     // tertiary / hint text
+  final Color border;           // card & divider borders
+  final Color borderLight;      // subtle separators
+  final Color divider;          // divider lines
+  final Color iconDefault;      // default icon tint
+  final Color avatarBg;         // avatar / circle backgrounds
+  final Color chipBg;           // chip / tag backgrounds
+
+  const _CsdColorSet._({
+    required this.surface,
+    required this.surfaceAlt,
+    required this.surfaceDim,
+    required this.onSurface,
+    required this.onSurfaceAlt,
+    required this.onSurfaceDim,
+    required this.border,
+    required this.borderLight,
+    required this.divider,
+    required this.iconDefault,
+    required this.avatarBg,
+    required this.chipBg,
+  });
+
+  static const _light = _CsdColorSet._(
+    surface: AppColors.white,
+    surfaceAlt: AppColors.gray100,
+    surfaceDim: AppColors.lightGray,
+    onSurface: AppColors.black,
+    onSurfaceAlt: AppColors.gray700,
+    onSurfaceDim: AppColors.gray600,
+    border: AppColors.gray300,
+    borderLight: AppColors.gray200,
+    divider: AppColors.gray200,
+    iconDefault: AppColors.gray700,
+    avatarBg: AppColors.gray200,
+    chipBg: AppColors.gray100,
+  );
+
+  static const _dark = _CsdColorSet._(
+    surface: AppColors.darkGray,
+    surfaceAlt: AppColors.gray900,
+    surfaceDim: Color(0xFF111111),
+    onSurface: AppColors.white,
+    onSurfaceAlt: AppColors.gray400,
+    onSurfaceDim: AppColors.gray500,
+    border: AppColors.gray700,
+    borderLight: AppColors.gray800,
+    divider: AppColors.gray800,
+    iconDefault: AppColors.gray400,
+    avatarBg: AppColors.gray800,
+    chipBg: AppColors.gray800,
+  );
+}
+
 /// Main app theme
 class AppTheme {
   AppTheme._();

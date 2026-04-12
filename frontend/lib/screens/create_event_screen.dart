@@ -251,7 +251,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
               contentPadding: EdgeInsets.zero,
               secondary: Icon(
                 _isLocked ? Icons.lock : Icons.lock_open,
-                color: _isLocked ? AppColors.black : AppColors.gray500,
+                color: _isLocked ? context.csd.onSurface : context.csd.onSurfaceDim,
               ),
             ),
 
@@ -662,10 +662,10 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
             horizontal: AppSpacing.xs,
           ),
           decoration: BoxDecoration(
-            color: isSelected ? color.withValues(alpha: 0.2) : AppColors.gray100,
+            color: isSelected ? color.withValues(alpha: 0.2) : context.csd.surfaceAlt,
             borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
-              color: isSelected ? color : AppColors.gray300,
+              color: isSelected ? color : context.csd.border,
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -688,7 +688,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                    color: isSelected ? color : AppColors.gray700,
+                    color: isSelected ? color : context.csd.iconDefault,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),

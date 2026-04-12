@@ -272,7 +272,3 @@ After modifying freezed models or Drift tables:
 ```bash
 dart run build_runner build --delete-conflicting-outputs
 ```
-
-## License
-
-MIT

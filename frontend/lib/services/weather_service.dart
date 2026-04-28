@@ -62,7 +62,8 @@ class DayWeather {
     }
   }
 
-  String get tempRange => '${tempHigh.round()}°/${tempLow.round()}°';
+  /// Min/max for display (e.g. `9°/16°`).
+  String get tempRange => '${tempLow.round()}°/${tempHigh.round()}°';
 }
 
 /// Service for fetching weather data
@@ -74,6 +75,71 @@ class WeatherService {
   // Cache weather data
   final Map<String, List<DayWeather>> _cache = {};
   DateTime? _lastFetch;
+
+  String _dateKey(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  /// Daily forecast for an inclusive date range (e.g. one calendar week).
+  /// Uses Open-Meteo (free, no API key). [start] and [end] are calendar dates.
+  Future<List<DayWeather>> getForecastForDateRange({
+    required DateTime start,
+    required DateTime end,
+    double latitude = 37.7749,
+    double longitude = -122.4194,
+  }) async {
+    final startD = DateTime(start.year, start.month, start.day);
+    final endD = DateTime(end.year, end.month, end.day);
+    final cacheKey =
+        '${latitude.toStringAsFixed(2)},${longitude.toStringAsFixed(2)},${_dateKey(startD)},${_dateKey(endD)}';
+
+    if (_cache.containsKey(cacheKey) &&
+        _lastFetch != null &&
+        DateTime.now().difference(_lastFetch!) < const Duration(hours: 1)) {
+      return _cache[cacheKey]!;
+    }
+
+    try {
+      final url = Uri.parse(
+        'https://api.open-meteo.com/v1/forecast'
+        '?latitude=$latitude'
+        '&longitude=$longitude'
+        '&daily=temperature_2m_max,temperature_2m_min,weathercode,windspeed_10m_max'
+        '&timezone=auto'
+        '&start_date=${_dateKey(startD)}'
+        '&end_date=${_dateKey(endD)}',
+      );
+
+      final client = HttpClient();
+      final request = await client.getUrl(url);
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      final data = jsonDecode(body) as Map<String, dynamic>;
+
+      final daily = data['daily'] as Map<String, dynamic>;
+      final dates = (daily['time'] as List).cast<String>();
+      final maxTemps = (daily['temperature_2m_max'] as List).cast<num>();
+      final minTemps = (daily['temperature_2m_min'] as List).cast<num>();
+      final weatherCodes = (daily['weathercode'] as List).cast<num>();
+
+      final forecast = <DayWeather>[];
+      for (var i = 0; i < dates.length; i++) {
+        forecast.add(DayWeather(
+          date: DateTime.parse(dates[i]),
+          tempHigh: maxTemps[i].toDouble(),
+          tempLow: minTemps[i].toDouble(),
+          condition: _mapWeatherCode(weatherCodes[i].toInt()),
+          description: _describeWeatherCode(weatherCodes[i].toInt()),
+        ));
+      }
+
+      _cache[cacheKey] = forecast;
+      _lastFetch = DateTime.now();
+      return forecast;
+    } catch (e) {
+      debugPrint('Weather range fetch failed: $e');
+      return [];
+    }
+  }
 
   /// Fetch 7-day forecast for a location
   /// Uses Open-Meteo API (free, no key required)

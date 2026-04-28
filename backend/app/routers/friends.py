@@ -13,6 +13,7 @@ from app.models.friendship import (
     Friendship, FriendRequest, FriendshipResponse, FriendshipStatus,
     Poke, PokeCreate
 )
+from app.services.recurrence import expand_recurrence_in_range
 
 router = APIRouter()
 
@@ -22,6 +23,45 @@ class FriendshipUpdate(BaseModel):
     is_favorite: Optional[bool] = None
     is_muted: Optional[bool] = None
     nickname: Optional[str] = None
+
+
+@router.get("/calendar/{friend_user_id}")
+async def get_friend_calendar(
+    friend_user_id: UUID,
+    start: datetime,
+    end: datetime,
+    user: User = Depends(get_current_user),
+):
+    """Return a friend's events in a range for calendar comparison."""
+    friendship = supabase.table("friendships").select("id").or_(
+        f"and(requester_id.eq.{user.id},addressee_id.eq.{friend_user_id}),"
+        f"and(requester_id.eq.{friend_user_id},addressee_id.eq.{user.id})"
+    ).eq("status", "accepted").execute()
+
+    if not friendship.data:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only compare calendars with accepted friends",
+        )
+
+    friend_events = supabase.table("events").select("*").eq(
+        "owner_id", str(friend_user_id)
+    ).is_("deleted_at", "null").or_(
+        f"and(start_time.lte.{end.isoformat()},end_time.gte.{start.isoformat()}),"
+        "recurrence_rule_id.not.is.null"
+    ).execute().data or []
+
+    expanded_events = []
+    for event in friend_events:
+        if event.get("recurrence_rule_id") and not event.get("recurrence_parent_id"):
+            expanded_events.extend(await expand_recurrence_in_range(event, start, end))
+        elif not event.get("recurrence_parent_id"):
+            expanded_events.append(event)
+
+    return {
+        "events": expanded_events,
+        "total": len(expanded_events),
+    }
 
 
 @router.get("")

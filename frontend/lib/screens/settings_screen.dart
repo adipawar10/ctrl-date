@@ -2,13 +2,18 @@
 /// User preferences and app settings
 library;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../main.dart';
 import '../providers/auth_provider.dart';
+import '../providers/weather_location_provider.dart';
 import '../router.dart';
+import '../services/api_service.dart';
+import '../services/encryption_service.dart';
 import '../theme.dart';
 
 /// Settings screen for user preferences
@@ -42,7 +47,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final weatherLoc = ref.watch(weatherLocationProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -152,6 +157,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: Text(_weekStart == 'monday' ? 'Monday' : 'Sunday'),
             trailing: const Icon(Icons.chevron_right),
             onTap: _selectWeekStart,
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.wb_sunny_outlined),
+            title: const Text('Use device location for weather'),
+            subtitle: Text(
+              weatherLoc.useDeviceLocation
+                  ? (kIsWeb
+                      ? 'Web uses saved or default coordinates (no GPS)'
+                      : 'Week view uses GPS when available; last known position is cached')
+                  : 'Uses saved coordinates or default (San Francisco)',
+            ),
+            value: weatherLoc.useDeviceLocation,
+            onChanged: (value) {
+              ref.read(weatherLocationProvider.notifier).setUseDeviceLocation(value);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.my_location),
+            title: const Text('Refresh weather location'),
+            subtitle: Text(
+              '${weatherLoc.latitude.toStringAsFixed(2)}, ${weatherLoc.longitude.toStringAsFixed(2)}',
+            ),
+            enabled: weatherLoc.useDeviceLocation && !kIsWeb,
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              final ok =
+                  await ref.read(weatherLocationProvider.notifier).refreshFromDevice();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    ok
+                        ? 'Location updated for weather'
+                        : 'Could not get location. Check permissions and services.',
+                  ),
+                ),
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.timer),
@@ -898,11 +941,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 leading: const Icon(Icons.key),
                 title: const Text('Export public key'),
                 subtitle: const Text('Share with friends for secure messaging'),
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Public key copied to clipboard')),
-                  );
+                  await _exportAndSyncPublicKey();
                 },
               ),
               ListTile(
@@ -944,11 +985,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              // TODO: Regenerate keys
+              final ok = await _regenerateAndSyncKeys();
+              if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('New keys generated')),
+                SnackBar(
+                  content: Text(ok
+                      ? 'New keys generated and synced'
+                      : 'Failed to regenerate/sync keys'),
+                ),
               );
             },
             child: Text('Regenerate', style: TextStyle(color: AppColors.error)),
@@ -1005,6 +1051,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+
+  Future<bool> _syncPublicKeyToBackend() async {
+    try {
+      await EncryptionService.instance.initialize();
+      final publicKey = await EncryptionService.instance.getPublicKey();
+      final response = await ApiService.instance.put(
+        '/auth/public-key',
+        body: {'public_key': publicKey},
+      );
+      return response.isSuccess;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _exportAndSyncPublicKey() async {
+    await EncryptionService.instance.initialize();
+    final publicKey = await EncryptionService.instance.getPublicKey();
+    final synced = await _syncPublicKeyToBackend();
+    await Clipboard.setData(ClipboardData(text: publicKey));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          synced
+              ? 'Public key copied and synced to server'
+              : 'Public key copied (server sync failed)',
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _regenerateAndSyncKeys() async {
+    try {
+      await EncryptionService.instance.regenerateKeyPair();
+      return _syncPublicKeyToBackend();
+    } catch (_) {
+      return false;
+    }
   }
 
   void _openUrl(String url) {

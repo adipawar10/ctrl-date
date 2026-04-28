@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'dart:convert' as convert;
 
 import '../models/event.dart' as models;
 import '../models/reflection.dart' as models;
@@ -82,13 +83,40 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<models.Event?> getEventById(String id) async {
-    final row = await (select(events)..where((e) => e.id.equals(id)))
+    final row =
+        await (select(events)..where((e) => e.id.equals(id))).getSingleOrNull();
+    return row != null ? _mapEventRowToModel(row) : null;
+  }
+
+  /// Single event only if it belongs to [userId] (multi-account safety).
+  Future<models.Event?> getEventByIdForUser(String id, String userId) async {
+    final row = await (select(events)
+          ..where((e) => e.id.equals(id) & e.userId.equals(userId)))
         .getSingleOrNull();
     return row != null ? _mapEventRowToModel(row) : null;
   }
 
+  Future<List<models.Event>> getEventsForUserId(String userId) async {
+    final rows =
+        await (select(events)..where((e) => e.userId.equals(userId))).get();
+    return rows.map(_mapEventRowToModel).toList();
+  }
+
+  Stream<List<models.Event>> watchEventsForUserId(String userId) {
+    return (select(events)..where((e) => e.userId.equals(userId)))
+        .watch()
+        .map((rows) => rows.map(_mapEventRowToModel).toList());
+  }
+
   Future<List<models.Event>> getUnsyncedEvents() async {
-    final rows = await (select(events)..where((e) => e.isSynced.equals(false)))
+    final rows =
+        await (select(events)..where((e) => e.isSynced.equals(false))).get();
+    return rows.map(_mapEventRowToModel).toList();
+  }
+
+  Future<List<models.Event>> getUnsyncedEventsForUserId(String userId) async {
+    final rows = await (select(events)
+          ..where((e) => e.isSynced.equals(false) & e.userId.equals(userId)))
         .get();
     return rows.map(_mapEventRowToModel).toList();
   }
@@ -124,9 +152,18 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<models.DailyReflection?> getReflectionById(String id) async {
-    final row =
-        await (select(dailyReflections)..where((r) => r.id.equals(id)))
-            .getSingleOrNull();
+    final row = await (select(dailyReflections)..where((r) => r.id.equals(id)))
+        .getSingleOrNull();
+    return row != null ? _mapReflectionRowToModel(row) : null;
+  }
+
+  Future<models.DailyReflection?> getReflectionByIdForUser(
+    String id,
+    String userId,
+  ) async {
+    final row = await (select(dailyReflections)
+          ..where((r) => r.id.equals(id) & r.userId.equals(userId)))
+        .getSingleOrNull();
     return row != null ? _mapReflectionRowToModel(row) : null;
   }
 
@@ -134,18 +171,73 @@ class AppDatabase extends _$AppDatabase {
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
-    final row = await (select(dailyReflections)
+    final rows = await (select(dailyReflections)
           ..where((r) =>
               r.date.isBiggerOrEqualValue(startOfDay) &
-              r.date.isSmallerThanValue(endOfDay)))
-        .getSingleOrNull();
+              r.date.isSmallerThanValue(endOfDay))
+          ..orderBy([
+            (r) => OrderingTerm.desc(r.updatedAt),
+            (r) => OrderingTerm.desc(r.createdAt),
+          ])
+          ..limit(1))
+        .get();
 
-    return row != null ? _mapReflectionRowToModel(row) : null;
+    if (rows.isEmpty) return null;
+    return _mapReflectionRowToModel(rows.first);
+  }
+
+  Future<models.DailyReflection?> getReflectionByDateForUser(
+    DateTime date,
+    String userId,
+  ) async {
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final rows = await (select(dailyReflections)
+          ..where((r) =>
+              r.date.isBiggerOrEqualValue(startOfDay) &
+              r.date.isSmallerThanValue(endOfDay) &
+              r.userId.equals(userId))
+          ..orderBy([
+            (r) => OrderingTerm.desc(r.updatedAt),
+            (r) => OrderingTerm.desc(r.createdAt),
+          ])
+          ..limit(1))
+        .get();
+
+    if (rows.isEmpty) return null;
+    return _mapReflectionRowToModel(rows.first);
+  }
+
+  Future<List<models.DailyReflection>> getReflectionsForUserId(
+    String userId,
+  ) async {
+    final rows = await (select(dailyReflections)
+          ..where((r) => r.userId.equals(userId)))
+        .get();
+    return rows.map(_mapReflectionRowToModel).toList();
+  }
+
+  Stream<List<models.DailyReflection>> watchReflectionsForUserId(
+    String userId,
+  ) {
+    return (select(dailyReflections)..where((r) => r.userId.equals(userId)))
+        .watch()
+        .map((rows) => rows.map(_mapReflectionRowToModel).toList());
   }
 
   Future<List<models.DailyReflection>> getUnsyncedReflections() async {
     final rows = await (select(dailyReflections)
           ..where((r) => r.isSynced.equals(false)))
+        .get();
+    return rows.map(_mapReflectionRowToModel).toList();
+  }
+
+  Future<List<models.DailyReflection>> getUnsyncedReflectionsForUserId(
+    String userId,
+  ) async {
+    final rows = await (select(dailyReflections)
+          ..where((r) => r.isSynced.equals(false) & r.userId.equals(userId)))
         .get();
     return rows.map(_mapReflectionRowToModel).toList();
   }
@@ -235,6 +327,46 @@ class AppDatabase extends _$AppDatabase {
   }
 
   // Mapping functions
+  models.RecurrenceRule? _recurrenceRuleFromStoredJson(String? stored) {
+    if (stored == null) return null;
+    try {
+      final decoded = _parseJson(stored);
+      if (decoded is! Map<String, dynamic>) return null;
+      final normalized = Map<String, dynamic>.from(decoded);
+      if (normalized['byWeekDay'] == null) {
+        final w = normalized['by_weekday'] ?? normalized['by_week_day'];
+        if (w != null) {
+          normalized['byWeekDay'] =
+              (w as List).map((e) => (e as num).toInt()).toList();
+        }
+      }
+      if (normalized['byMonthDay'] == null &&
+          normalized['by_monthday'] != null) {
+        normalized['byMonthDay'] = (normalized['by_monthday'] as List)
+            .map((e) => (e as num).toInt())
+            .toList();
+      }
+      if (normalized['byMonth'] == null && normalized['by_month'] != null) {
+        normalized['byMonth'] = (normalized['by_month'] as List)
+            .map((e) => (e as num).toInt())
+            .toList();
+      }
+      if (normalized['until'] == null && normalized['until_date'] != null) {
+        final u = normalized['until_date'];
+        if (u is String) {
+          normalized['until'] = u;
+        }
+      }
+      final freq = normalized['frequency'];
+      if (freq is String) {
+        normalized['frequency'] = freq.toLowerCase();
+      }
+      return models.RecurrenceRule.fromJson(normalized);
+    } catch (_) {
+      return null;
+    }
+  }
+
   models.Event _mapEventRowToModel(Event row) {
     return models.Event(
       id: row.id,
@@ -256,11 +388,7 @@ class AppDatabase extends _$AppDatabase {
       ),
       color: row.color,
       tags: _parseJsonList(row.tags).cast<String>(),
-      recurrenceRule: row.recurrenceRule != null
-          ? models.RecurrenceRule.fromJson(
-              _parseJson(row.recurrenceRule!) as Map<String, dynamic>,
-            )
-          : null,
+      recurrenceRule: _recurrenceRuleFromStoredJson(row.recurrenceRule),
       parentEventId: row.parentEventId,
       reminders: _parseJsonList(row.reminders)
           .map((r) => models.EventReminder.fromJson(r as Map<String, dynamic>))
@@ -301,8 +429,10 @@ class AppDatabase extends _$AppDatabase {
             : null,
       ),
       parentEventId: Value(event.parentEventId),
-      reminders: Value(_toJsonString(event.reminders.map((r) => r.toJson()).toList())),
-      attachments: Value(_toJsonString(event.attachments.map((a) => a.toJson()).toList())),
+      reminders:
+          Value(_toJsonString(event.reminders.map((r) => r.toJson()).toList())),
+      attachments: Value(
+          _toJsonString(event.attachments.map((a) => a.toJson()).toList())),
       isPrivate: Value(event.isPrivate),
       encryptedData: Value(event.encryptedData),
       isShared: Value(event.isShared),
@@ -407,40 +537,12 @@ class AppDatabase extends _$AppDatabase {
 
 /// Helper to decode JSON
 dynamic jsonDecode(String source) {
-  return _JsonDecoder.decode(source);
+  return convert.jsonDecode(source);
 }
 
 /// Helper to encode JSON
 String jsonEncode(dynamic object) {
-  return _JsonEncoder.encode(object);
-}
-
-/// Simple JSON decoder
-class _JsonDecoder {
-  static dynamic decode(String source) {
-    // This would use dart:convert in the actual implementation
-    // Simplified placeholder that would be replaced by proper JSON parsing
-    if (source.startsWith('[')) {
-      return <dynamic>[];
-    }
-    if (source.startsWith('{')) {
-      return <String, dynamic>{};
-    }
-    return null;
-  }
-}
-
-/// Simple JSON encoder
-class _JsonEncoder {
-  static String encode(dynamic object) {
-    if (object is List) {
-      return '[]'; // Placeholder
-    }
-    if (object is Map) {
-      return '{}'; // Placeholder
-    }
-    return object.toString();
-  }
+  return convert.jsonEncode(object);
 }
 
 /// Open database connection

@@ -52,6 +52,10 @@ class DailyReflectionCreate(BaseModel):
     """Schema for creating/updating a reflection."""
     notes: Optional[str] = None
     mood: Optional[int] = Field(None, ge=1, le=5)
+    events_planned: Optional[int] = Field(None, ge=0)
+    events_completed: Optional[int] = Field(None, ge=0)
+    events_skipped: Optional[int] = Field(None, ge=0)
+    events_partial: Optional[int] = Field(None, ge=0)
 
 
 class Streak(BaseModel):

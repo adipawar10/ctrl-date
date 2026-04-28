@@ -194,7 +194,15 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.dualCalendar,
       name: 'dual-calendar',
       parentNavigatorKey: rootNavigatorKey,
-      builder: (context, state) => const DualCalendarScreen(),
+      builder: (context, state) {
+        final friendUserId = state.uri.queryParameters['friendUserId'];
+        final dateStr = state.uri.queryParameters['date'];
+        final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
+        return DualCalendarScreen(
+          friendUserId: friendUserId,
+          initialDate: date,
+        );
+      },
     ),
 
     GoRoute(
@@ -230,8 +238,10 @@ final GoRouter appRouter = GoRouter(
     if (isAuthenticated) {
       // Check if onboarding and preferences are complete
       final prefs = await SharedPreferences.getInstance();
-      final onboardingComplete = prefs.getBool(OnboardingKeys.onboardingComplete) ?? false;
-      final preferencesComplete = prefs.getBool(OnboardingKeys.preferencesComplete) ?? false;
+      final onboardingComplete =
+          prefs.getBool(OnboardingKeys.onboardingComplete) ?? false;
+      final preferencesComplete =
+          prefs.getBool(OnboardingKeys.preferencesComplete) ?? false;
 
       // If onboarding or preferences not complete, redirect to onboarding
       if ((!onboardingComplete || !preferencesComplete) && !isOnboardingRoute) {

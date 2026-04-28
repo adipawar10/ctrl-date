@@ -3,10 +3,90 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../models/event.dart';
+import '../providers/events_provider.dart';
 import '../router.dart';
+import '../providers/weather_location_provider.dart';
+import '../services/weather_service.dart';
 import '../theme.dart';
+import '../utils/weather_icons.dart';
+
+int _calendarPriorityInt(EventPriority p) {
+  return switch (p) {
+    EventPriority.low => 1,
+    EventPriority.medium => 2,
+    EventPriority.high => 3,
+    EventPriority.urgent => 4,
+  };
+}
+
+/// Maps an [Event] into the structure used by embedded day/week painters.
+Map<String, dynamic> _eventToTimedOverlayMap(
+  Event e, {
+  required int visibleStartHour,
+  required int visibleEndHour,
+}) {
+  if (e.isAllDay) {
+    return <String, dynamic>{
+      'id': e.id,
+      'title': e.title,
+      'start_hour': visibleStartHour,
+      'start_minute': 0,
+      'end_hour': visibleEndHour,
+      'end_minute': 0,
+      'is_locked': false,
+      'priority': _calendarPriorityInt(e.priority),
+    };
+  }
+  return <String, dynamic>{
+    'id': e.id,
+    'title': e.title,
+    'start_hour': e.startTime.hour,
+    'start_minute': e.startTime.minute,
+    'end_hour': e.endTime.hour,
+    'end_minute': e.endTime.minute,
+    'is_locked': false,
+    'priority': _calendarPriorityInt(e.priority),
+  };
+}
+
+Map<String, dynamic> _eventToMonthDotMap(Event e) {
+  return <String, dynamic>{
+    'title': e.title,
+    'is_locked': false,
+    'priority': _calendarPriorityInt(e.priority),
+  };
+}
+
+List<Event> _eventsStartingOnDay(List<Event> all, DateTime day) {
+  return all
+      .where(
+        (e) =>
+            e.startTime.year == day.year &&
+            e.startTime.month == day.month &&
+            e.startTime.day == day.day,
+      )
+      .toList();
+}
+
+Map<String, List<Map<String, dynamic>>> _groupMonthDotsByDayKey(
+  List<Event> all,
+) {
+  final map = <String, List<Map<String, dynamic>>>{};
+  for (final e in all) {
+    final key = DateFormat('yyyy-MM-dd').format(e.startTime);
+    map.putIfAbsent(key, () => []).add(_eventToMonthDotMap(e));
+  }
+  return map;
+}
+
+/// Day/week timeline: rows for each hour from midnight through 11 PM (0–23).
+/// [kCalendarVisibleEndHour] is exclusive (24), matching [List.generate] length.
+const int kCalendarVisibleStartHour = 0;
+const int kCalendarVisibleEndHour = 24;
 
 /// Calendar interval options
 enum CalendarInterval { day, week, month }
@@ -288,7 +368,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Widget _buildCalendarView() {
     // Use a key based on interval and date to force rebuild when switching
-    final key = ValueKey('${_selectedInterval.name}_${_selectedDate.toIso8601String()}');
+    final key = ValueKey(
+        '${_selectedInterval.name}_${_selectedDate.toIso8601String()}');
 
     switch (_selectedInterval) {
       case CalendarInterval.day:
@@ -356,7 +437,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 }
 
 /// Embedded Day View without its own AppBar
-class _EmbeddedDayView extends StatefulWidget {
+class _EmbeddedDayView extends ConsumerStatefulWidget {
   final DateTime date;
   final ValueChanged<DateTime> onDateChanged;
 
@@ -367,48 +448,14 @@ class _EmbeddedDayView extends StatefulWidget {
   });
 
   @override
-  State<_EmbeddedDayView> createState() => _EmbeddedDayViewState();
+  ConsumerState<_EmbeddedDayView> createState() => _EmbeddedDayViewState();
 }
 
-class _EmbeddedDayViewState extends State<_EmbeddedDayView> {
+class _EmbeddedDayViewState extends ConsumerState<_EmbeddedDayView> {
   late ScrollController _scrollController;
   final double _hourHeight = 60.0;
-  final int _startHour = 6;
-  final int _endHour = 22;
-
-  // Mock data - replace with actual state management
-  final List<Map<String, dynamic>> _events = [
-    {
-      'id': '1',
-      'title': 'Team Standup',
-      'start_hour': 9,
-      'start_minute': 0,
-      'end_hour': 9,
-      'end_minute': 30,
-      'is_locked': true,
-      'priority': 3,
-    },
-    {
-      'id': '2',
-      'title': 'Deep Work: Project Alpha',
-      'start_hour': 10,
-      'start_minute': 0,
-      'end_hour': 12,
-      'end_minute': 0,
-      'is_locked': false,
-      'priority': 4,
-    },
-    {
-      'id': '4',
-      'title': 'Client Meeting',
-      'start_hour': 14,
-      'start_minute': 0,
-      'end_hour': 15,
-      'end_minute': 0,
-      'is_locked': true,
-      'priority': 4,
-    },
-  ];
+  final int _startHour = kCalendarVisibleStartHour;
+  final int _endHour = kCalendarVisibleEndHour;
 
   @override
   void initState() {
@@ -459,6 +506,21 @@ class _EmbeddedDayViewState extends State<_EmbeddedDayView> {
 
   @override
   Widget build(BuildContext context) {
+    final eventsAsync = ref.watch(eventsProvider);
+    final dayEvents = eventsAsync.maybeWhen(
+      data: (all) => _eventsStartingOnDay(all, widget.date),
+      orElse: () => <Event>[],
+    );
+    final overlayMaps = dayEvents
+        .map(
+          (e) => _eventToTimedOverlayMap(
+            e,
+            visibleStartHour: _startHour,
+            visibleEndHour: _endHour,
+          ),
+        )
+        .toList();
+
     return SingleChildScrollView(
       controller: _scrollController,
       child: Stack(
@@ -479,7 +541,7 @@ class _EmbeddedDayViewState extends State<_EmbeddedDayView> {
             _buildCurrentTimeIndicator(context),
 
           // Events overlay
-          ..._buildEventOverlays(context),
+          ..._buildEventOverlays(context, overlayMaps),
         ],
       ),
     );
@@ -563,14 +625,17 @@ class _EmbeddedDayViewState extends State<_EmbeddedDayView> {
     );
   }
 
-  List<Widget> _buildEventOverlays(BuildContext context) {
+  List<Widget> _buildEventOverlays(
+    BuildContext context,
+    List<Map<String, dynamic>> events,
+  ) {
     final overlays = <Widget>[];
 
-    for (final event in _events) {
-      final startMinutes =
-          ((event['start_hour'] as int) - _startHour) * 60 + (event['start_minute'] as int);
-      final endMinutes =
-          ((event['end_hour'] as int) - _startHour) * 60 + (event['end_minute'] as int);
+    for (final event in events) {
+      final startMinutes = ((event['start_hour'] as int) - _startHour) * 60 +
+          (event['start_minute'] as int);
+      final endMinutes = ((event['end_hour'] as int) - _startHour) * 60 +
+          (event['end_minute'] as int);
       final duration = endMinutes - startMinutes;
 
       final top = startMinutes * (_hourHeight / 60);
@@ -669,7 +734,7 @@ class _EmbeddedDayViewState extends State<_EmbeddedDayView> {
 }
 
 /// Embedded Week View without its own AppBar
-class _EmbeddedWeekView extends StatefulWidget {
+class _EmbeddedWeekView extends ConsumerStatefulWidget {
   final DateTime date;
   final ValueChanged<DateTime> onDateChanged;
 
@@ -680,83 +745,78 @@ class _EmbeddedWeekView extends StatefulWidget {
   });
 
   @override
-  State<_EmbeddedWeekView> createState() => _EmbeddedWeekViewState();
+  ConsumerState<_EmbeddedWeekView> createState() => _EmbeddedWeekViewState();
 }
 
-class _EmbeddedWeekViewState extends State<_EmbeddedWeekView> {
+class _EmbeddedWeekViewState extends ConsumerState<_EmbeddedWeekView> {
   late DateTime _weekStart;
+  late Future<List<DayWeather>> _weekWeatherFuture;
+  int? _weatherKey;
   late ScrollController _verticalScrollController;
   final double _hourHeight = 50.0;
-  final int _startHour = 6;
-  final int _endHour = 22;
+  final int _startHour = kCalendarVisibleStartHour;
+  final int _endHour = kCalendarVisibleEndHour;
 
-  // Mock events - replace with actual state management
-  final Map<String, List<Map<String, dynamic>>> _eventsByDay = {};
+  bool _calendarWeekChanged(DateTime a, DateTime b) {
+    final wa = _getWeekStart(a);
+    final wb = _getWeekStart(b);
+    return wa.year != wb.year || wa.month != wb.month || wa.day != wb.day;
+  }
 
   @override
   void initState() {
     super.initState();
     _weekStart = _getWeekStart(widget.date);
+    final start = DateTime(_weekStart.year, _weekStart.month, _weekStart.day);
+    _weekWeatherFuture = WeatherService.instance.getForecastForDateRange(
+      start: start,
+      end: start.add(const Duration(days: 6)),
+    );
     _verticalScrollController = ScrollController();
-
-    _loadMockEvents();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToCurrentTime();
     });
   }
 
-  void _loadMockEvents() {
-    final today = DateTime.now();
-    final todayKey = DateFormat('yyyy-MM-dd').format(today);
+  @override
+  void didUpdateWidget(_EmbeddedWeekView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.date.year != widget.date.year ||
+        oldWidget.date.month != widget.date.month ||
+        oldWidget.date.day != widget.date.day) {
+      final nextWeekStart = _getWeekStart(widget.date);
+      final weekChanged = _calendarWeekChanged(oldWidget.date, widget.date);
+      setState(() {
+        _weekStart = nextWeekStart;
+        if (weekChanged) {
+          _weatherKey = null;
+        }
+      });
+    }
+  }
 
-    _eventsByDay[todayKey] = [
-      {
-        'id': '1',
-        'title': 'Standup',
-        'start_hour': 9,
-        'start_minute': 0,
-        'end_hour': 9,
-        'end_minute': 30,
-        'is_locked': true,
-        'priority': 3,
-      },
-      {
-        'id': '2',
-        'title': 'Deep Work',
-        'start_hour': 10,
-        'start_minute': 0,
-        'end_hour': 12,
-        'end_minute': 0,
-        'is_locked': false,
-        'priority': 4,
-      },
-      {
-        'id': '3',
-        'title': 'Meeting',
-        'start_hour': 14,
-        'start_minute': 0,
-        'end_hour': 15,
-        'end_minute': 0,
-        'is_locked': true,
-        'priority': 4,
-      },
-    ];
-
-    final tomorrow = today.add(const Duration(days: 1));
-    final tomorrowKey = DateFormat('yyyy-MM-dd').format(tomorrow);
-    _eventsByDay[tomorrowKey] = [
-      {
-        'id': '4',
-        'title': 'Planning',
-        'start_hour': 10,
-        'start_minute': 0,
-        'end_hour': 11,
-        'end_minute': 0,
-        'is_locked': false,
-        'priority': 2,
-      },
-    ];
+  Map<String, List<Map<String, dynamic>>> _buildEventsByDay(
+    List<Event> all,
+  ) {
+    final out = <String, List<Map<String, dynamic>>>{};
+    for (var i = 0; i < 7; i++) {
+      final day = _weekStart.add(Duration(days: i));
+      final key = DateFormat('yyyy-MM-dd').format(day);
+      final maps = _eventsStartingOnDay(all, day)
+          .map(
+            (e) => _eventToTimedOverlayMap(
+              e,
+              visibleStartHour: _startHour,
+              visibleEndHour: _endHour,
+            ),
+          )
+          .toList();
+      if (maps.isNotEmpty) {
+        out[key] = maps;
+      }
+    }
+    return out;
   }
 
   @override
@@ -801,6 +861,31 @@ class _EmbeddedWeekViewState extends State<_EmbeddedWeekView> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = ref.watch(weatherLocationProvider);
+    final weekStartDay =
+        DateTime(_weekStart.year, _weekStart.month, _weekStart.day);
+    final weekEndDay = weekStartDay.add(const Duration(days: 6));
+    final weatherKey = Object.hash(
+      weekStartDay.year,
+      weekStartDay.month,
+      weekStartDay.day,
+      (loc.latitude * 10000).round(),
+      (loc.longitude * 10000).round(),
+    );
+    if (_weatherKey != weatherKey) {
+      _weatherKey = weatherKey;
+      _weekWeatherFuture = WeatherService.instance.getForecastForDateRange(
+        start: weekStartDay,
+        end: weekEndDay,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+      );
+    }
+
+    final eventsAsync = ref.watch(eventsProvider);
+    final all = eventsAsync.valueOrNull ?? <Event>[];
+    final eventsByDay = _buildEventsByDay(all);
+
     return Column(
       children: [
         // Day headers
@@ -808,7 +893,7 @@ class _EmbeddedWeekViewState extends State<_EmbeddedWeekView> {
 
         // Week grid
         Expanded(
-          child: _buildWeekGrid(context),
+          child: _buildWeekGrid(context, eventsByDay),
         ),
       ],
     );
@@ -818,64 +903,144 @@ class _EmbeddedWeekViewState extends State<_EmbeddedWeekView> {
     final theme = Theme.of(context);
     final today = DateTime.now();
 
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
-        ),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 50),
-          ...List.generate(7, (index) {
-            final day = _weekStart.add(Duration(days: index));
-            final isToday = _isSameDay(day, today);
+    return FutureBuilder<List<DayWeather>>(
+      future: _weekWeatherFuture,
+      builder: (context, snapshot) {
+        final byDate = <String, DayWeather>{};
+        if (snapshot.hasData) {
+          for (final w in snapshot.data!) {
+            byDate[DateFormat('yyyy-MM-dd').format(w.date)] = w;
+          }
+        }
+        final loading = snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData;
 
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => widget.onDateChanged(day),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: isToday ? context.csd.surfaceAlt : null,
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        DateFormat('E').format(day),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: isToday ? context.csd.onSurface : context.csd.onSurfaceDim,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: isToday ? context.csd.onSurface : null,
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          '${day.day}',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: isToday ? context.csd.surface : context.csd.onSurface,
-                            fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (loading)
+              LinearProgressIndicator(
+                minHeight: 2,
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                color: theme.colorScheme.outline,
+              ),
+            Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(width: 50),
+                  ...List.generate(7, (index) {
+                    final day = _weekStart.add(Duration(days: index));
+                    final dayKey = DateFormat('yyyy-MM-dd').format(day);
+                    final w = byDate[dayKey];
+                    final isToday = _isSameDay(day, today);
+
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => widget.onDateChanged(day),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: isToday ? context.csd.surfaceAlt : null,
+                          ),
+                          child: Column(
+                            children: [
+                              SizedBox(
+                                height: 34,
+                                child: Center(
+                                  child: loading
+                                      ? const SizedBox.shrink()
+                                      : w != null
+                                          ? Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  w.weatherIconData,
+                                                  size: 16,
+                                                  color: isToday
+                                                      ? context.csd.onSurface
+                                                      : context
+                                                          .csd.onSurfaceDim,
+                                                ),
+                                                Text(
+                                                  w.tempRange,
+                                                  style: theme
+                                                      .textTheme.labelSmall
+                                                      ?.copyWith(
+                                                    fontSize: 9,
+                                                    height: 1.1,
+                                                    color: isToday
+                                                        ? context.csd.onSurface
+                                                        : context
+                                                            .csd.onSurfaceDim,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          : Text(
+                                              '—',
+                                              style: theme.textTheme.labelSmall
+                                                  ?.copyWith(
+                                                color: context.csd.onSurfaceDim,
+                                              ),
+                                            ),
+                                ),
+                              ),
+                              Text(
+                                DateFormat('E').format(day),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: isToday
+                                      ? context.csd.onSurface
+                                      : context.csd.onSurfaceDim,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: isToday ? context.csd.onSurface : null,
+                                  shape: BoxShape.circle,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  '${day.day}',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    color: isToday
+                                        ? context.csd.surface
+                                        : context.csd.onSurface,
+                                    fontWeight: isToday
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
+                    );
+                  }),
+                ],
               ),
-            );
-          }),
-        ],
-      ),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildWeekGrid(BuildContext context) {
+  Widget _buildWeekGrid(
+    BuildContext context,
+    Map<String, List<Map<String, dynamic>>> eventsByDay,
+  ) {
     final theme = Theme.of(context);
     final today = DateTime.now();
 
@@ -917,12 +1082,14 @@ class _EmbeddedWeekViewState extends State<_EmbeddedWeekView> {
                 final day = _weekStart.add(Duration(days: dayIndex));
                 final isToday = _isSameDay(day, today);
                 final dayKey = DateFormat('yyyy-MM-dd').format(day);
-                final dayEvents = _eventsByDay[dayKey] ?? [];
+                final dayEvents = eventsByDay[dayKey] ?? [];
 
                 return Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: isToday ? context.csd.surfaceAlt.withValues(alpha: 0.5) : null,
+                      color: isToday
+                          ? context.csd.surfaceAlt.withValues(alpha: 0.5)
+                          : null,
                       border: Border(
                         left: BorderSide(
                           color: theme.colorScheme.outlineVariant,
@@ -968,10 +1135,10 @@ class _EmbeddedWeekViewState extends State<_EmbeddedWeekView> {
   }
 
   Widget _buildEventBlock(BuildContext context, Map<String, dynamic> event) {
-    final startMinutes =
-        ((event['start_hour'] as int) - _startHour) * 60 + (event['start_minute'] as int);
-    final endMinutes =
-        ((event['end_hour'] as int) - _startHour) * 60 + (event['end_minute'] as int);
+    final startMinutes = ((event['start_hour'] as int) - _startHour) * 60 +
+        (event['start_minute'] as int);
+    final endMinutes = ((event['end_hour'] as int) - _startHour) * 60 +
+        (event['end_minute'] as int);
     final duration = endMinutes - startMinutes;
 
     final top = startMinutes * (_hourHeight / 60);
@@ -1063,7 +1230,7 @@ class _EmbeddedWeekViewState extends State<_EmbeddedWeekView> {
 }
 
 /// Embedded Month View without its own AppBar
-class _EmbeddedMonthView extends StatefulWidget {
+class _EmbeddedMonthView extends ConsumerStatefulWidget {
   final DateTime date;
   final ValueChanged<DateTime> onDateChanged;
 
@@ -1074,42 +1241,18 @@ class _EmbeddedMonthView extends StatefulWidget {
   });
 
   @override
-  State<_EmbeddedMonthView> createState() => _EmbeddedMonthViewState();
+  ConsumerState<_EmbeddedMonthView> createState() => _EmbeddedMonthViewState();
 }
 
-class _EmbeddedMonthViewState extends State<_EmbeddedMonthView> {
-  // Mock events - replace with actual state management
-  final Map<String, List<Map<String, dynamic>>> _eventsByDay = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _loadMockEvents();
-  }
-
-  void _loadMockEvents() {
-    final now = DateTime.now();
-
-    _eventsByDay[DateFormat('yyyy-MM-dd').format(now)] = [
-      {'title': 'Standup', 'priority': 3, 'is_locked': true},
-      {'title': 'Deep Work', 'priority': 4, 'is_locked': false},
-      {'title': 'Meeting', 'priority': 4, 'is_locked': true},
-    ];
-
-    final tomorrow = now.add(const Duration(days: 1));
-    _eventsByDay[DateFormat('yyyy-MM-dd').format(tomorrow)] = [
-      {'title': 'Planning', 'priority': 2, 'is_locked': false},
-    ];
-
-    final nextWeek = now.add(const Duration(days: 7));
-    _eventsByDay[DateFormat('yyyy-MM-dd').format(nextWeek)] = [
-      {'title': 'Review', 'priority': 3, 'is_locked': false},
-      {'title': 'Demo', 'priority': 4, 'is_locked': true},
-    ];
-  }
-
+class _EmbeddedMonthViewState extends ConsumerState<_EmbeddedMonthView> {
   @override
   Widget build(BuildContext context) {
+    final eventsAsync = ref.watch(eventsProvider);
+    final eventsByDay = eventsAsync.maybeWhen(
+      data: _groupMonthDotsByDayKey,
+      orElse: () => <String, List<Map<String, dynamic>>>{},
+    );
+
     return Column(
       children: [
         // Weekday headers
@@ -1117,7 +1260,7 @@ class _EmbeddedMonthViewState extends State<_EmbeddedMonthView> {
 
         // Calendar grid
         Expanded(
-          child: _buildCalendarGrid(context),
+          child: _buildCalendarGrid(context, eventsByDay),
         ),
       ],
     );
@@ -1142,7 +1285,9 @@ class _EmbeddedMonthViewState extends State<_EmbeddedMonthView> {
               child: Text(
                 day,
                 style: theme.textTheme.labelMedium?.copyWith(
-                  color: isWeekend ? context.csd.onSurfaceDim : context.csd.iconDefault,
+                  color: isWeekend
+                      ? context.csd.onSurfaceDim
+                      : context.csd.iconDefault,
                 ),
               ),
             ),
@@ -1152,7 +1297,10 @@ class _EmbeddedMonthViewState extends State<_EmbeddedMonthView> {
     );
   }
 
-  Widget _buildCalendarGrid(BuildContext context) {
+  Widget _buildCalendarGrid(
+    BuildContext context,
+    Map<String, List<Map<String, dynamic>>> eventsByDay,
+  ) {
     final days = _getCalendarDays();
     final today = DateTime.now();
     final currentMonth = DateTime(widget.date.year, widget.date.month);
@@ -1171,7 +1319,7 @@ class _EmbeddedMonthViewState extends State<_EmbeddedMonthView> {
         final isCurrentMonth = day.month == currentMonth.month;
         final isToday = _isSameDay(day, today);
         final dayKey = DateFormat('yyyy-MM-dd').format(day);
-        final events = _eventsByDay[dayKey] ?? [];
+        final events = eventsByDay[dayKey] ?? [];
 
         return _buildDayCell(
           context,
@@ -1270,7 +1418,8 @@ class _EmbeddedMonthViewState extends State<_EmbeddedMonthView> {
   List<DateTime> _getCalendarDays() {
     final currentMonth = DateTime(widget.date.year, widget.date.month);
     final firstDayOfMonth = DateTime(currentMonth.year, currentMonth.month, 1);
-    final lastDayOfMonth = DateTime(currentMonth.year, currentMonth.month + 1, 0);
+    final lastDayOfMonth =
+        DateTime(currentMonth.year, currentMonth.month + 1, 0);
 
     var firstCalendarDay = firstDayOfMonth;
     while (firstCalendarDay.weekday != DateTime.monday) {

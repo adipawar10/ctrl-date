@@ -443,6 +443,8 @@ class NotificationService {
       case MessageType.friendRequest:
       case MessageType.friendAccepted:
         return _settings.friendRequests;
+      case MessageType.text:
+        return _settings.systemMessages;
       case MessageType.poke:
         return _settings.pokes;
       case MessageType.eventShare:
@@ -468,6 +470,7 @@ class NotificationService {
       case MessageType.friendRequest:
       case MessageType.friendAccepted:
       case MessageType.poke:
+      case MessageType.text:
         return _channelIdSocial;
       case MessageType.eventShare:
       case MessageType.eventReminder:

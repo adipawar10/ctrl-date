@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../models/event.dart';
 import '../models/suggestion.dart';
+import '../providers/auth_provider.dart';
 import '../providers/events_provider.dart';
 import '../theme.dart';
 
@@ -22,6 +24,8 @@ class AiSuggestionsScreen extends ConsumerStatefulWidget {
 class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
   bool _isLoading = false;
   bool _hasError = false;
+  String? _errorMessage;
+  String? _promptResponse;
   List<Suggestion> _suggestions = [];
   Map<String, dynamic>? _analysis;
 
@@ -86,9 +90,32 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
                 const SizedBox(width: AppSpacing.sm),
                 IconButton.filled(
                   onPressed: _isLoading ? null : _refreshSuggestions,
-                  icon: const Icon(Icons.send),
+                  icon: const Icon(Icons.send, color: Colors.white),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  _QuickPromptChip(
+                    label: 'I want to study more',
+                    onTap: () => _setPromptAndRefresh('I want to study more'),
+                  ),
+                  _QuickPromptChip(
+                    label: 'I am feeling stressed lately',
+                    onTap: () => _setPromptAndRefresh(
+                      'I am feeling stressed lately',
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -108,6 +135,10 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
                                 // Schedule analysis card
                                 if (_analysis != null) ...[
                                   _buildAnalysisCard(context),
+                                  const SizedBox(height: AppSpacing.md),
+                                ],
+                                if ((_promptResponse ?? '').isNotEmpty) ...[
+                                  _buildPromptResponseCard(context),
                                   const SizedBox(height: AppSpacing.md),
                                 ],
                           // Suggestions list
@@ -322,6 +353,31 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
     );
   }
 
+  Widget _buildPromptResponseCard(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: context.csd.surfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: context.csd.borderLight),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.chat_bubble_outline, size: 20),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              _promptResponse ?? '',
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmptyState(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -376,7 +432,7 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Please check your connection and try again.',
+              _errorMessage ?? 'Please check your connection and try again.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: context.csd.onSurfaceDim,
               ),
@@ -398,6 +454,8 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
     setState(() {
       _isLoading = true;
       _hasError = false;
+      _errorMessage = null;
+      _promptResponse = null;
     });
 
     try {
@@ -409,7 +467,7 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
         body: {
           'start_date': now.toIso8601String().split('T')[0],
           'end_date': now.add(const Duration(days: 7)).toIso8601String().split('T')[0],
-          'max_suggestions': 5,
+          'max_suggestions': userPrompt.isNotEmpty ? 8 : 5,
           if (userPrompt.isNotEmpty) 'user_prompt': userPrompt,
         },
       );
@@ -421,19 +479,13 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
         final rawSuggestions = (data['suggestions'] as List?) ?? [];
 
         setState(() {
-          _suggestions = rawSuggestions.map((s) {
-            final start = DateTime.parse(s['suggestedStart']);
-            final end = DateTime.parse(s['suggestedEnd']);
-            return Suggestion(
-              id: s['id'] ?? '',
-              title: s['title'] ?? 'Suggestion',
-              durationMinutes: s['durationMinutes'] ?? end.difference(start).inMinutes,
-              suggestedStart: start,
-              suggestedEnd: end,
-              reason: s['reason'] ?? '',
-            );
-          }).toList();
+          _suggestions = rawSuggestions
+              .whereType<Map<String, dynamic>>()
+              .map(_parseSuggestion)
+              .whereType<Suggestion>()
+              .toList();
           _analysis = data['analysis'] as Map<String, dynamic>?;
+          _promptResponse = data['prompt_response']?.toString();
           _isLoading = false;
           _dismissedSuggestions.clear();
         });
@@ -441,6 +493,7 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
         setState(() {
           _isLoading = false;
           _hasError = true;
+          _errorMessage = response.error?.message ?? 'Failed to load suggestions.';
         });
       }
     } catch (e) {
@@ -448,8 +501,37 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
       setState(() {
         _isLoading = false;
         _hasError = true;
+        _errorMessage = e.toString();
       });
     }
+  }
+
+  Suggestion? _parseSuggestion(Map<String, dynamic> data) {
+    final startRaw = data['suggestedStart'];
+    final endRaw = data['suggestedEnd'];
+    if (startRaw is! String || endRaw is! String) {
+      return null;
+    }
+    final start = DateTime.tryParse(startRaw);
+    final end = DateTime.tryParse(endRaw);
+    if (start == null || end == null || !end.isAfter(start)) {
+      return null;
+    }
+    final durationMinutes =
+        (data['durationMinutes'] as int?) ?? end.difference(start).inMinutes;
+    return Suggestion(
+      id: (data['id'] ?? '').toString(),
+      title: (data['title'] ?? 'Suggestion').toString(),
+      durationMinutes: durationMinutes,
+      suggestedStart: start,
+      suggestedEnd: end,
+      reason: (data['reason'] ?? '').toString(),
+    );
+  }
+
+  void _setPromptAndRefresh(String prompt) {
+    _promptController.text = prompt;
+    _refreshSuggestions();
   }
 
   void _dismissSuggestion(String suggestionId) {
@@ -473,7 +555,7 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
     // Show confirmation dialog - never auto-add
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Add to Calendar'),
         content: Text(
           'Add "${suggestion.title}" to your calendar?\n\n'
@@ -484,27 +566,42 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               setState(() {
                 _dismissedSuggestions.add(suggestion.id);
               });
 
               try {
-                final api = ref.read(apiServiceProvider);
-                await api.post('/ai/suggestions/${suggestion.id}/apply');
+                final userId = ref.read(currentUserIdProvider);
+                if (userId == null || userId.isEmpty) {
+                  throw Exception('No signed-in user found.');
+                }
+
+                final nowMs = DateTime.now().microsecondsSinceEpoch;
+                final event = Event(
+                  id: 'ai-$nowMs',
+                  userId: userId,
+                  title: suggestion.title,
+                  startTime: suggestion.suggestedStart,
+                  endTime: suggestion.suggestedEnd,
+                  description: suggestion.reason,
+                  tags: const ['ai_suggested'],
+                  isSynced: false,
+                );
+                await ref.read(eventsProvider.notifier).createEvent(event);
 
                 // Send positive feedback
+                final api = ref.read(apiServiceProvider);
                 await api.post('/ai/suggestions/feedback', body: {
                   'suggestion_id': suggestion.id,
                   'accepted': true,
                 });
 
-                // Refresh events
                 ref.invalidate(eventsProvider);
 
                 if (mounted) {
@@ -515,6 +612,9 @@ class _AiSuggestionsScreenState extends ConsumerState<AiSuggestionsScreen> {
                   );
                 }
               } catch (e) {
+                setState(() {
+                  _dismissedSuggestions.remove(suggestion.id);
+                });
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Failed to add: $e')),
@@ -559,6 +659,25 @@ class _AnalysisStat extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _QuickPromptChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickPromptChip({
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      avatar: const Icon(Icons.auto_awesome, size: 16),
+      label: Text(label),
+      onPressed: onTap,
     );
   }
 }

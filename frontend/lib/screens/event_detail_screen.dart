@@ -9,12 +9,14 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../main.dart';
+import '../models/event.dart';
 import '../theme.dart';
+import '../providers/auth_provider.dart';
 import '../providers/events_provider.dart';
 import '../providers/friends_provider.dart';
 import '../widgets/priority_indicator.dart';
 import '../widgets/locked_badge.dart';
-import '../widgets/conflict_warning.dart';
 
 /// Event detail screen for viewing and editing events
 class EventDetailScreen extends ConsumerStatefulWidget {
@@ -31,50 +33,111 @@ class EventDetailScreen extends ConsumerStatefulWidget {
 
 class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   bool _isLoading = true;
+  bool _loadError = false;
   bool _isEditing = false;
 
-  // Mock event data - replace with actual state management
+  /// Display map (keeps existing UI helpers working).
   late Map<String, dynamic> _event;
 
-  // Form controllers
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
   late TextEditingController _locationController;
   late TextEditingController _notesController;
 
+  static int _priorityToInt(EventPriority p) {
+    return switch (p) {
+      EventPriority.low => 1,
+      EventPriority.medium => 2,
+      EventPriority.high => 3,
+      EventPriority.urgent => 4,
+    };
+  }
+
+  static EventPriority _priorityFromInt(int p) {
+    return switch (p) {
+      1 => EventPriority.low,
+      2 => EventPriority.medium,
+      3 => EventPriority.high,
+      _ => EventPriority.urgent,
+    };
+  }
+
+  static Map<String, dynamic> _eventMapFromModel(Event e) {
+    return <String, dynamic>{
+      'id': e.id,
+      'title': e.title,
+      'description': e.description ?? '',
+      'location': e.location ?? '',
+      'start_time': e.startTime,
+      'end_time': e.endTime,
+      'all_day': e.isAllDay,
+      'is_locked': false,
+      'priority': _priorityToInt(e.priority),
+      'status': e.status.name,
+      'tags': e.tags,
+      'recurrence': e.recurrenceRule?.description,
+      'completion_notes': null,
+      'is_private': e.isPrivate,
+    };
+  }
+
   @override
   void initState() {
     super.initState();
-    _loadEvent();
+    _titleController = TextEditingController();
+    _descriptionController = TextEditingController();
+    _locationController = TextEditingController();
+    _notesController = TextEditingController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadEvent());
+  }
+
+  @override
+  void didUpdateWidget(EventDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.eventId != widget.eventId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadEvent());
+    }
   }
 
   Future<void> _loadEvent() async {
-    // Simulate API call
-    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _loadError = false;
+    });
 
-    // Mock event data
-    _event = {
-      'id': widget.eventId,
-      'title': 'Team Standup',
-      'description': 'Daily sync with the engineering team',
-      'location': 'Conference Room A / Zoom',
-      'start_time': DateTime.now().copyWith(hour: 9, minute: 0),
-      'end_time': DateTime.now().copyWith(hour: 9, minute: 30),
-      'all_day': false,
-      'is_locked': true,
-      'priority': 3,
-      'status': 'scheduled',
-      'tags': ['work', 'meeting'],
-      'recurrence': 'Daily (weekdays)',
-      'completion_notes': null,
-    };
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null || userId.isEmpty) {
+      setState(() {
+        _isLoading = false;
+        _loadError = true;
+      });
+      return;
+    }
 
-    _titleController = TextEditingController(text: _event['title']);
-    _descriptionController = TextEditingController(text: _event['description']);
-    _locationController = TextEditingController(text: _event['location']);
-    _notesController = TextEditingController(text: _event['completion_notes'] ?? '');
+    final event = await ref
+        .read(databaseProvider)
+        .getEventByIdForUser(widget.eventId, userId);
 
-    setState(() => _isLoading = false);
+    if (!mounted) return;
+    if (event == null) {
+      setState(() {
+        _isLoading = false;
+        _loadError = true;
+      });
+      return;
+    }
+
+    _event = _eventMapFromModel(event);
+    _titleController.text = event.title;
+    _descriptionController.text = event.description ?? '';
+    _locationController.text = event.location ?? '';
+    _notesController.text = '';
+
+    setState(() {
+      _isLoading = false;
+      _loadError = false;
+    });
   }
 
   @override
@@ -94,6 +157,47 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       return Scaffold(
         appBar: AppBar(),
         body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_loadError) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/');
+              }
+            },
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.event_busy, size: 48),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'Event not found',
+                  style: theme.textTheme.titleLarge,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'It may have been deleted or is not on this device.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: context.csd.onSurfaceDim,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
 
@@ -185,15 +289,16 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: _saveEvent,
+              onPressed: () async => _saveEvent(),
               child: const Text('Save'),
             ),
           ],
         ],
       ),
       body: _isEditing ? _buildEditForm(context) : _buildEventDetails(context),
-      bottomNavigationBar:
-          !_isEditing && _event['status'] == 'scheduled' ? _buildCompletionBar(context) : null,
+      bottomNavigationBar: !_isEditing && _event['status'] == 'scheduled'
+          ? _buildCompletionBar(context)
+          : null,
     );
   }
 
@@ -291,7 +396,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           ],
 
           // Description
-          if (_event['description'] != null && _event['description'].isNotEmpty) ...[
+          if (_event['description'] != null &&
+              _event['description'].isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             _buildDetailRow(
               context,
@@ -305,7 +411,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           ],
 
           // Tags
-          if (_event['tags'] != null && (_event['tags'] as List).isNotEmpty) ...[
+          if (_event['tags'] != null &&
+              (_event['tags'] as List).isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             _buildDetailRow(
               context,
@@ -461,15 +568,13 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
           const SizedBox(height: AppSpacing.md),
 
-          // Date and time pickers would go here
-          // For now, showing placeholder
           ListTile(
             leading: const Icon(Icons.access_time),
-            title: Text(
-              DateFormat('EEE, MMM d').format(_event['start_time']),
-            ),
+            title: const Text('Date & time'),
             subtitle: Text(
-              '${DateFormat('HH:mm').format(_event['start_time'])} - ${DateFormat('HH:mm').format(_event['end_time'])}',
+              '${DateFormat('EEE, MMM d, y').format(_event['start_time'] as DateTime)} · '
+              '${DateFormat('HH:mm').format(_event['start_time'] as DateTime)} – '
+              '${DateFormat('HH:mm').format(_event['end_time'] as DateTime)}',
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: _showDateTimePicker,
@@ -506,33 +611,40 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           border: Border(
-            top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+            top:
+                BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
           ),
         ),
         child: Row(
           children: [
             Expanded(
-              child: OutlinedButton.icon(
+              child: _completionBarButton(
+                context,
                 onPressed: () => _markComplete('skipped'),
-                icon: const Icon(Icons.skip_next),
-                label: const Text('Skip'),
+                icon: Icons.skip_next,
+                label: 'Skip',
+                filled: false,
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
-              child: OutlinedButton.icon(
+              child: _completionBarButton(
+                context,
                 onPressed: () => _markComplete('partial'),
-                icon: const Icon(Icons.timelapse),
-                label: const Text('Partial'),
+                icon: Icons.timelapse,
+                label: 'Partial',
+                filled: false,
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               flex: 2,
-              child: ElevatedButton.icon(
+              child: _completionBarButton(
+                context,
                 onPressed: () => _markComplete('completed'),
-                icon: const Icon(Icons.check),
-                label: const Text('Complete'),
+                icon: Icons.check,
+                label: 'Complete',
+                filled: true,
               ),
             ),
           ],
@@ -561,25 +673,140 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     }
   }
 
-  void _showDateTimePicker() {
-    // TODO: Implement date/time picker
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Date/time picker coming soon')),
+  Widget _completionBarButton(
+    BuildContext context, {
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    required bool filled,
+  }) {
+    final child = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 20),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+        ),
+      ],
+    );
+    if (filled) {
+      return ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        ),
+        child: child,
+      );
+    }
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      ),
+      child: child,
     );
   }
 
-  void _saveEvent() {
-    // TODO: Implement save
-    setState(() {
-      _event['title'] = _titleController.text;
-      _event['description'] = _descriptionController.text;
-      _event['location'] = _locationController.text;
-      _isEditing = false;
-    });
+  Future<void> _showDateTimePicker() async {
+    if (!mounted) return;
+    final start = _event['start_time'] as DateTime;
+    final end = _event['end_time'] as DateTime;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Event updated')),
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime(start.year, start.month, start.day),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
     );
+    if (pickedDate == null || !mounted) return;
+
+    if (!context.mounted) return;
+    final startTod = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(start),
+    );
+    if (startTod == null || !mounted) return;
+
+    final newStart = DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      startTod.hour,
+      startTod.minute,
+    );
+
+    if (!context.mounted) return;
+    final endTod = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(end),
+    );
+    if (endTod == null || !mounted) return;
+
+    var newEnd = DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      endTod.hour,
+      endTod.minute,
+    );
+
+    if (!newEnd.isAfter(newStart)) {
+      newEnd = newStart.add(const Duration(hours: 1));
+    }
+
+    setState(() {
+      _event['start_time'] = newStart;
+      _event['end_time'] = newEnd;
+    });
+  }
+
+  Future<void> _saveEvent() async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null || userId.isEmpty) return;
+    final existing = await ref
+        .read(databaseProvider)
+        .getEventByIdForUser(widget.eventId, userId);
+    if (!mounted) return;
+    if (existing == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event not found')),
+      );
+      return;
+    }
+
+    final updated = existing.copyWith(
+      title: _titleController.text.trim(),
+      description: _descriptionController.text.trim().isEmpty
+          ? null
+          : _descriptionController.text.trim(),
+      location: _locationController.text.trim().isEmpty
+          ? null
+          : _locationController.text.trim(),
+      startTime: _event['start_time'] as DateTime,
+      endTime: _event['end_time'] as DateTime,
+      priority: _priorityFromInt(_event['priority'] as int),
+      updatedAt: DateTime.now(),
+    );
+
+    try {
+      await ref.read(eventActionsProvider).update(updated);
+      if (!mounted) return;
+      setState(() {
+        _event = _eventMapFromModel(updated);
+        _isEditing = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event updated')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save: $e')),
+      );
+    }
   }
 
   void _markComplete(String status) {
@@ -618,9 +845,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                       Navigator.pop(context);
                       setState(() {
                         _event['status'] = status;
-                        _event['completion_notes'] = _notesController.text.isEmpty
-                            ? null
-                            : _notesController.text;
+                        _event['completion_notes'] =
+                            _notesController.text.isEmpty
+                                ? null
+                                : _notesController.text;
                       });
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Event marked as $status')),
@@ -648,7 +876,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       if (!response.isSuccess || response.data == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(response.error?.message ?? 'Failed to generate invite link')),
+            SnackBar(
+                content: Text(response.error?.message ??
+                    'Failed to generate invite link')),
           );
         }
         return;
@@ -685,8 +915,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 Text(
                   'Share this link to invite others to this event:',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: context.csd.onSurfaceDim,
-                  ),
+                        color: context.csd.onSurfaceDim,
+                      ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Container(
@@ -700,9 +930,10 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                       Expanded(
                         child: Text(
                           link,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontFamily: 'monospace',
-                          ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    fontFamily: 'monospace',
+                                  ),
                         ),
                       ),
                       IconButton(
@@ -711,7 +942,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                           Clipboard.setData(ClipboardData(text: link));
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Link copied to clipboard')),
+                            const SnackBar(
+                                content: Text('Link copied to clipboard')),
                           );
                         },
                       ),
@@ -735,7 +967,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         );
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Invite link revoked')),
+                            const SnackBar(
+                                content: Text('Invite link revoked')),
                           );
                         }
                       } catch (e) {
@@ -776,7 +1009,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       if (!response.isSuccess) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(response.error?.message ?? 'Failed to update privacy')),
+            SnackBar(
+                content: Text(
+                    response.error?.message ?? 'Failed to update privacy')),
           );
         }
         return;
@@ -790,7 +1025,9 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              newValue ? 'Event is now private' : 'Event is now visible to friends',
+              newValue
+                  ? 'Event is now private'
+                  : 'Event is now visible to friends',
             ),
           ),
         );
@@ -825,30 +1062,29 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   void _deleteEvent() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Event'),
         content: const Text('Are you sure you want to delete this event?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
+              final messenger = ScaffoldMessenger.of(context);
               try {
-                await ref
-                    .read(eventActionsProvider)
-                    .delete(widget.eventId);
+                await ref.read(eventActionsProvider).delete(widget.eventId);
                 if (mounted) {
                   context.pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     const SnackBar(content: Text('Event deleted')),
                   );
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(content: Text('Failed to delete: $e')),
                   );
                 }
@@ -936,7 +1172,8 @@ class _ShareEventSheetState extends ConsumerState<_ShareEventSheet> {
                   return const Padding(
                     padding: EdgeInsets.all(AppSpacing.lg),
                     child: Center(
-                      child: Text('No friends yet. Add friends to share events.'),
+                      child:
+                          Text('No friends yet. Add friends to share events.'),
                     ),
                   );
                 }
@@ -953,8 +1190,7 @@ class _ShareEventSheetState extends ConsumerState<_ShareEventSheet> {
                           Supabase.instance.client.auth.currentUser?.id ?? '';
                       final friendId = friend.getFriendId(currentUserId);
                       final profile = friend.getFriendProfile(currentUserId);
-                      final displayName =
-                          profile?.displayName ?? 'Unknown';
+                      final displayName = profile?.displayName ?? 'Unknown';
 
                       return ListTile(
                         leading: CircleAvatar(
@@ -984,8 +1220,7 @@ class _ShareEventSheetState extends ConsumerState<_ShareEventSheet> {
                   ),
                 );
               },
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error loading friends: $e')),
             ),
           ],

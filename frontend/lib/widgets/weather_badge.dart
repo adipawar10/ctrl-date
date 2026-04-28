@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../services/weather_service.dart';
 import '../theme.dart';
+import '../utils/weather_icons.dart';
 
 /// Compact weather badge for calendar day cells
 class WeatherBadge extends StatelessWidget {
@@ -23,9 +24,10 @@ class WeatherBadge extends StatelessWidget {
     if (compact) {
       return Tooltip(
         message: '${weather.description} · ${weather.tempRange}',
-        child: Text(
-          weather.icon,
-          style: const TextStyle(fontSize: 12),
+        child: Icon(
+          weather.weatherIconData,
+          size: 12,
+          color: AppColors.gray600,
         ),
       );
     }
@@ -42,7 +44,7 @@ class WeatherBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(weather.icon, style: const TextStyle(fontSize: 14)),
+          Icon(weather.weatherIconData, size: 14, color: AppColors.gray600),
           const SizedBox(width: 2),
           Text(
             weather.tempRange,

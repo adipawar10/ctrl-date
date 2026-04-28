@@ -17,6 +17,40 @@ from app.models.event import Event, EventCreate, EventStatus
 
 router = APIRouter()
 
+STRESS_KEYWORDS = {
+    "stress",
+    "stressed",
+    "anxious",
+    "anxiety",
+    "overwhelmed",
+    "burnout",
+    "burned out",
+}
+
+HEALTH_KEYWORDS = {
+    "fever",
+    "sick",
+    "ill",
+    "illness",
+    "drained",
+    "exhausted",
+    "fatigue",
+    "fatigued",
+    "headache",
+    "body ache",
+    "unwell",
+}
+
+STUDY_KEYWORDS = {
+    "study",
+    "studying",
+    "learn",
+    "learning",
+    "revision",
+    "revise",
+    "exam",
+}
+
 
 class SuggestionRequest(BaseModel):
     """Request for AI scheduling suggestions."""
@@ -56,6 +90,7 @@ class SuggestionResponse(BaseModel):
     """Response containing suggestions and analysis."""
     suggestions: List[Suggestion]
     analysis: ScheduleAnalysis
+    prompt_response: Optional[str] = None
 
 
 class SuggestionFeedback(BaseModel):
@@ -110,8 +145,11 @@ async def call_llm(system: str, prompt: str) -> dict:
     if settings.LLM_PROVIDER == "gemini":
         import google.generativeai as genai
         genai.configure(api_key=settings.GEMINI_API_KEY)
+        model_name = settings.LLM_MODEL or "gemini-1.5-flash"
+        if model_name.startswith("claude") or model_name.startswith("gpt"):
+            model_name = "gemini-1.5-flash"
         model = genai.GenerativeModel(
-            settings.LLM_MODEL,
+            model_name,
             system_instruction=system,
         )
         response = model.generate_content(
@@ -250,6 +288,234 @@ def validate_suggestions(
     return validated
 
 
+def _parse_event_dt(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
+    except ValueError:
+        return None
+
+
+def _find_available_slots(
+    events: List[dict],
+    start_date: date,
+    end_date: date,
+    working_start_hour: int,
+    working_end_hour: int,
+    min_duration_minutes: int = 15,
+    limit: int = 8,
+) -> List[tuple[datetime, datetime]]:
+    slots: List[tuple[datetime, datetime]] = []
+    current_day = start_date
+
+    while current_day <= end_date and len(slots) < limit:
+        day_start = datetime.combine(current_day, datetime.min.time()).replace(hour=working_start_hour)
+        day_end = datetime.combine(current_day, datetime.min.time()).replace(hour=working_end_hour)
+        if day_end <= day_start:
+            day_end = day_start + timedelta(hours=8)
+
+        day_events: List[tuple[datetime, datetime]] = []
+        for event in events:
+            start = _parse_event_dt(event.get("start_time"))
+            end = _parse_event_dt(event.get("end_time"))
+            if not start or not end:
+                continue
+            if end <= day_start or start >= day_end:
+                continue
+            clipped_start = max(start, day_start)
+            clipped_end = min(end, day_end)
+            if clipped_end > clipped_start:
+                day_events.append((clipped_start, clipped_end))
+
+        day_events.sort(key=lambda item: item[0])
+        merged: List[tuple[datetime, datetime]] = []
+        for start, end in day_events:
+            if not merged or start > merged[-1][1]:
+                merged.append((start, end))
+            else:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+
+        cursor = day_start
+        for start, end in merged:
+            if (start - cursor).total_seconds() >= min_duration_minutes * 60:
+                slots.append((cursor, start))
+                if len(slots) >= limit:
+                    return slots
+            cursor = max(cursor, end)
+
+        if (day_end - cursor).total_seconds() >= min_duration_minutes * 60:
+            slots.append((cursor, day_end))
+            if len(slots) >= limit:
+                return slots
+
+        current_day += timedelta(days=1)
+
+    return slots
+
+
+def _slot_or_fallback(
+    slots: List[tuple[datetime, datetime]],
+    fallback_day: date,
+    duration_minutes: int,
+    preferred_hour: int,
+) -> tuple[datetime, datetime]:
+    for slot_start, slot_end in slots:
+        if (slot_end - slot_start).total_seconds() >= duration_minutes * 60:
+            return slot_start, slot_start + timedelta(minutes=duration_minutes)
+
+    start = datetime.combine(fallback_day, datetime.min.time()).replace(hour=preferred_hour, minute=0, second=0, microsecond=0)
+    end = start + timedelta(minutes=duration_minutes)
+    return start, end
+
+
+def _build_static_suggestions(
+    request: SuggestionRequest,
+    events: List[dict],
+    working_start_hour: int,
+    working_end_hour: int,
+) -> List[dict]:
+    prompt = (request.user_prompt or "").lower()
+    slots = _find_available_slots(
+        events=events,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        working_start_hour=working_start_hour,
+        working_end_hour=working_end_hour,
+        min_duration_minutes=10,
+        limit=16,
+    )
+    fallback_day = request.start_date + timedelta(days=1)
+    suggestions: List[dict] = []
+
+    if any(keyword in prompt for keyword in STUDY_KEYWORDS):
+        study_start, study_end = _slot_or_fallback(slots, fallback_day, 60, 10)
+        suggestions.append({
+            "id": f"sug_prompt_study_{request.start_date.isoformat()}",
+            "type": "add_event",
+            "title": "Focused study session",
+            "suggestedStart": study_start.isoformat(),
+            "suggestedEnd": study_end.isoformat(),
+            "reason": "This free slot fits uninterrupted study time.",
+            "confidence": 0.95,
+            "category": "focus_time",
+            "durationMinutes": 60,
+        })
+
+    if any(keyword in prompt for keyword in STRESS_KEYWORDS):
+        breathe_start, breathe_end = _slot_or_fallback(slots, fallback_day, 10, 11)
+        walk_start, walk_end = _slot_or_fallback(slots, fallback_day, 15, 16)
+        suggestions.extend([
+            {
+                "id": f"sug_prompt_stress_breathe_{request.start_date.isoformat()}",
+                "type": "add_event",
+                "title": "Breathing reset block",
+                "suggestedStart": breathe_start.isoformat(),
+                "suggestedEnd": breathe_end.isoformat(),
+                "reason": "Try 4 rounds of slow inhale/exhale. This quickly reduces stress.",
+                "confidence": 0.96,
+                "category": "break",
+                "durationMinutes": 10,
+            },
+            {
+                "id": f"sug_prompt_stress_walk_{request.start_date.isoformat()}",
+                "type": "add_event",
+                "title": "Short walk + hydration",
+                "suggestedStart": walk_start.isoformat(),
+                "suggestedEnd": walk_end.isoformat(),
+                "reason": "A 10-15 minute walk and water break helps calm your mind.",
+                "confidence": 0.94,
+                "category": "break",
+                "durationMinutes": 15,
+            },
+        ])
+
+    if any(keyword in prompt for keyword in HEALTH_KEYWORDS):
+        rest_start, rest_end = _slot_or_fallback(slots, fallback_day, 30, 11)
+        hydrate_start, hydrate_end = _slot_or_fallback(slots, fallback_day, 10, 12)
+        suggestions.extend([
+            {
+                "id": f"sug_prompt_health_rest_{request.start_date.isoformat()}",
+                "type": "add_event",
+                "title": "Recovery rest block",
+                "suggestedStart": rest_start.isoformat(),
+                "suggestedEnd": rest_end.isoformat(),
+                "reason": "Your body needs recovery time today. Prioritize rest.",
+                "confidence": 0.95,
+                "category": "break",
+                "durationMinutes": 30,
+            },
+            {
+                "id": f"sug_prompt_health_hydrate_{request.start_date.isoformat()}",
+                "type": "add_event",
+                "title": "Hydration + check-in",
+                "suggestedStart": hydrate_start.isoformat(),
+                "suggestedEnd": hydrate_end.isoformat(),
+                "reason": "Drink water and do a quick body check-in.",
+                "confidence": 0.93,
+                "category": "break",
+                "durationMinutes": 10,
+            },
+        ])
+
+    exercise_start, exercise_end = _slot_or_fallback(slots, fallback_day, 30, 8)
+    suggestions.append({
+        "id": f"sug_default_exercise_{request.start_date.isoformat()}",
+        "type": "add_event",
+        "title": "Do some exercise",
+        "suggestedStart": exercise_start.isoformat(),
+        "suggestedEnd": exercise_end.isoformat(),
+        "reason": "A short movement block boosts energy and focus for the day.",
+        "confidence": 0.93,
+        "category": "break",
+        "durationMinutes": 30,
+    })
+
+    rest_start, rest_end = _slot_or_fallback(slots, fallback_day, 20, 15)
+    suggestions.append({
+        "id": f"sug_default_rest_{request.start_date.isoformat()}",
+        "type": "add_event",
+        "title": "Have a rest block",
+        "suggestedStart": rest_start.isoformat(),
+        "suggestedEnd": rest_end.isoformat(),
+        "reason": "A short rest helps prevent burnout and keeps performance steady.",
+        "confidence": 0.91,
+        "category": "break",
+        "durationMinutes": 20,
+    })
+
+    return suggestions
+
+
+def _build_prompt_response(user_prompt: Optional[str]) -> Optional[str]:
+    prompt = (user_prompt or "").strip().lower()
+    if not prompt:
+        return None
+
+    if any(keyword in prompt for keyword in HEALTH_KEYWORDS):
+        return (
+            "Sorry you are feeling this way. Prioritize rest, hydration, and lighter tasks today. "
+            "If fever or symptoms worsen, please contact a medical professional."
+        )
+
+    if any(keyword in prompt for keyword in STRESS_KEYWORDS):
+        return (
+            "You are not alone in this. Start small: take 2 minutes of slow breathing, "
+            "drink water, and do one short walk. Then pick one tiny task for today."
+        )
+
+    if any(keyword in prompt for keyword in STUDY_KEYWORDS):
+        return (
+            "Try one focused 45-60 minute study block, then take a short break. "
+            "Consistency beats long sessions."
+        )
+
+    return (
+        "I can help you with short, actionable suggestions. "
+        "Try prompts like 'I want to study more' or 'I am feeling stressed lately'."
+    )
+
+
 @router.post("/suggestions")
 async def get_schedule_suggestions(
     request: SuggestionRequest,
@@ -302,6 +568,12 @@ async def get_schedule_suggestions(
 
     working_start = user.preferences.working_hours_start if user.preferences else "09:00"
     working_end = user.preferences.working_hours_end if user.preferences else "17:00"
+    try:
+        working_start_hour = int(working_start.split(":")[0])
+        working_end_hour = int(working_end.split(":")[0])
+    except (ValueError, IndexError):
+        working_start_hour = 9
+        working_end_hour = 17
 
     user_request_section = ""
     if request.user_prompt:
@@ -339,6 +611,13 @@ HISTORICAL PATTERNS (last 30 days):
 - Average completion: {sum(h["events_completed"] for h in history) / max(1, sum(h["events_planned"] for h in history)) * 100:.1f}%
 
 Generate {request.max_suggestions} scheduling suggestions to improve productivity."""
+
+    static_suggestions = _build_static_suggestions(
+        request=request,
+        events=events,
+        working_start_hour=working_start_hour,
+        working_end_hour=working_end_hour,
+    )
 
     # Call LLM (with fallback for testing)
     try:
@@ -381,7 +660,10 @@ Generate {request.max_suggestions} scheduling suggestions to improve productivit
         }
 
     # Validate suggestions
-    raw_suggestions = response.get("suggestions", [])
+    llm_suggestions = response.get("suggestions", [])
+    raw_suggestions = [*static_suggestions, *llm_suggestions]
+    if len(raw_suggestions) > request.max_suggestions:
+        raw_suggestions = raw_suggestions[:request.max_suggestions]
     validated = validate_suggestions(raw_suggestions, events, user)
 
     # Parse analysis
@@ -392,6 +674,7 @@ Generate {request.max_suggestions} scheduling suggestions to improve productivit
         meeting_hours=float(raw_analysis.get("meeting_hours", 0)),
         identified_gaps=raw_analysis.get("identified_gaps", []),
     )
+    prompt_response = _build_prompt_response(request.user_prompt)
 
     # Log suggestions for learning
     context_hash = hashlib.md5(
@@ -411,6 +694,7 @@ Generate {request.max_suggestions} scheduling suggestions to improve productivit
     return JSONResponse({
         "suggestions": [s.model_dump(by_alias=True, mode="json") for s in validated],
         "analysis": analysis.model_dump(),
+        "prompt_response": prompt_response,
     })
 
 

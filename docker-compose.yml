@@ -1,3 +1,5 @@
+# Environment variables: use a repo-root `.env`, or pass the backend file explicitly, e.g.
+#   docker compose --env-file backend/.env up -d
 version: '3.8'
 
 services:

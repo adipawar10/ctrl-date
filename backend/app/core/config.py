@@ -1,12 +1,27 @@
 """Application configuration using Pydantic Settings."""
 
-from typing import List
-from pydantic_settings import BaseSettings
+import json
 from functools import lru_cache
+from pathlib import Path
+from typing import Any, List
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Resolve backend/.env regardless of current working directory (uvicorn, tests, IDE).
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
+_ENV_FILE = _BACKEND_ROOT / ".env"
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
+
+    model_config = SettingsConfigDict(
+        env_file=_ENV_FILE if _ENV_FILE.is_file() else None,
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
     # Application
     APP_NAME: str = "Ctrl+Shift+Date"
@@ -17,7 +32,7 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    # CORS
+    # CORS — comma-separated, JSON array, or single "*"
     CORS_ORIGINS: List[str] = ["*"]
 
     # Supabase
@@ -54,9 +69,24 @@ class Settings(BaseSettings):
     RATE_LIMIT_REQUESTS: int = 100
     RATE_LIMIT_WINDOW: int = 60  # seconds
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Any) -> Any:
+        if v is None:
+            return ["*"]
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            s = v.strip()
+            if not s or s == "*":
+                return ["*"]
+            if s.startswith("["):
+                parsed = json.loads(s)
+                if not isinstance(parsed, list):
+                    raise ValueError("CORS_ORIGINS must be a JSON array when using bracket form")
+                return parsed
+            return [part.strip() for part in s.split(",") if part.strip()]
+        return v
 
 
 @lru_cache()

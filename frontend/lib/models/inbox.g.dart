@@ -61,6 +61,7 @@ Map<String, dynamic> _$$InboxMessageImplToJson(_$InboxMessageImpl instance) =>
     };
 
 const _$MessageTypeEnumMap = {
+  MessageType.text: 'text',
   MessageType.friendRequest: 'friend_request',
   MessageType.friendAccepted: 'friend_accepted',
   MessageType.poke: 'poke',

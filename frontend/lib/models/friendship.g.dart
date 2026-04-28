@@ -32,6 +32,7 @@ _$FriendshipImpl _$$FriendshipImplFromJson(Map<String, dynamic> json) =>
       isFavorite: json['isFavorite'] as bool? ?? false,
       isMuted: json['isMuted'] as bool? ?? false,
       sharedKey: json['sharedKey'] as String?,
+      friendPublicKey: json['friendPublicKey'] as String?,
       streakCount: (json['streak_count'] as num?)?.toInt() ?? 0,
       longestStreak: (json['longest_streak'] as num?)?.toInt() ?? 0,
     );
@@ -51,6 +52,7 @@ Map<String, dynamic> _$$FriendshipImplToJson(_$FriendshipImpl instance) =>
       'isFavorite': instance.isFavorite,
       'isMuted': instance.isMuted,
       'sharedKey': instance.sharedKey,
+      'friendPublicKey': instance.friendPublicKey,
       'streak_count': instance.streakCount,
       'longest_streak': instance.longestStreak,
     };

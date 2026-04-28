@@ -47,6 +47,18 @@ async def expand_recurrence_in_range(
     base_end = datetime.fromisoformat(event["end_time"].replace("Z", "+00:00"))
     duration = base_end - base_start
 
+    # Normalize range bounds to avoid aware/naive datetime comparison errors.
+    if base_start.tzinfo is not None:
+        if range_start.tzinfo is None:
+            range_start = range_start.replace(tzinfo=base_start.tzinfo)
+        if range_end.tzinfo is None:
+            range_end = range_end.replace(tzinfo=base_start.tzinfo)
+    else:
+        if range_start.tzinfo is not None:
+            range_start = range_start.replace(tzinfo=None)
+        if range_end.tzinfo is not None:
+            range_end = range_end.replace(tzinfo=None)
+
     # Build rrule kwargs
     rrule_kwargs = {
         'freq': FREQ_MAP.get(rule["frequency"], DAILY),
@@ -220,3 +232,5 @@ async def add_recurrence_exclusion(
         }).eq("id", rule["id"]).execute()
 
     return {"message": f"Excluded {exclude_date.isoformat()} from recurrence"}
+
+

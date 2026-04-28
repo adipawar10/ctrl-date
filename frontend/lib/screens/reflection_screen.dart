@@ -7,9 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../main.dart';
 import '../router.dart';
 import '../theme.dart';
+import '../models/event.dart';
 import '../models/reflection.dart';
+import '../providers/auth_provider.dart';
 import '../providers/reflection_provider.dart';
 import '../providers/events_provider.dart';
 import '../widgets/progress_indicator.dart' as app;
@@ -30,16 +33,16 @@ class ReflectionScreen extends ConsumerStatefulWidget {
 }
 
 class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
+  static const String _eventStatusTagPrefix = 'event_status:';
   late DateTime _selectedDate;
   final _notesController = TextEditingController();
   int? _selectedMood;
   bool _isLoading = true;
   bool _hasChanges = false;
 
-  // Mock data - replace with actual state management
+  // Reflection state
   late Map<String, dynamic> _reflection;
-  late List<Map<String, dynamic>> _events;
-  int _productivityStreak = 0;
+  List<Map<String, dynamic>> _events = [];
 
   @override
   void initState() {
@@ -56,80 +59,135 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
 
   Future<void> _loadReflection() async {
     setState(() => _isLoading = true);
+    try {
+      final all = ref.read(eventsProvider).valueOrNull ?? <Event>[];
+      _events = _buildReflectionEvents(all);
+      final userId = ref.read(currentUserIdProvider);
+      DailyReflection? saved;
+      if (userId != null && userId.isNotEmpty) {
+        saved = await ref
+            .read(databaseProvider)
+            .getReflectionByDateForUser(_selectedDate, userId);
+      }
 
-    // Simulate API call
-    await Future.delayed(const Duration(milliseconds: 500));
+      if (saved != null) {
+        final savedStatuses = _parseEventStatuses(saved.tags);
+        _events = _events
+            .map((e) => {
+                  ...e,
+                  'status': savedStatuses[e['id'] as String] ?? e['status'],
+                })
+            .toList();
+      }
 
-    // Mock data
-    _reflection = {
-      'events_planned': 5,
-      'events_completed': 3,
-      'events_skipped': 1,
-      'events_partial': 1,
-      'notes': 'Productive day overall. Need to improve focus in afternoon.',
-      'mood': 4,
-      'is_streak_day': true,
-    };
+      _reflection = {
+        'events_planned': _events.length,
+        'events_completed':
+            _events.where((e) => e['status'] == 'completed').length,
+        'events_skipped': _events.where((e) => e['status'] == 'skipped').length,
+        'events_partial': _events.where((e) => e['status'] == 'partial').length,
+        'notes': saved?.notes ?? '',
+        'mood': _intFromMood(saved?.mood) ?? 3,
+        'is_streak_day': false,
+      };
 
-    _events = [
-      {
-        'id': '1',
-        'title': 'Team Standup',
-        'start_time': _selectedDate.copyWith(hour: 9, minute: 0),
-        'end_time': _selectedDate.copyWith(hour: 9, minute: 30),
-        'status': 'completed',
-        'priority': 3,
-        'is_locked': true,
-      },
-      {
-        'id': '2',
-        'title': 'Deep Work: Project Alpha',
-        'start_time': _selectedDate.copyWith(hour: 10, minute: 0),
-        'end_time': _selectedDate.copyWith(hour: 12, minute: 0),
-        'status': 'completed',
-        'priority': 4,
-        'is_locked': false,
-      },
-      {
-        'id': '3',
-        'title': 'Lunch Break',
-        'start_time': _selectedDate.copyWith(hour: 12, minute: 0),
-        'end_time': _selectedDate.copyWith(hour: 13, minute: 0),
-        'status': 'skipped',
-        'priority': 1,
-        'is_locked': false,
-      },
-      {
-        'id': '4',
-        'title': 'Client Meeting',
-        'start_time': _selectedDate.copyWith(hour: 14, minute: 0),
-        'end_time': _selectedDate.copyWith(hour: 15, minute: 0),
-        'status': 'completed',
-        'priority': 4,
-        'is_locked': true,
-      },
-      {
-        'id': '5',
-        'title': 'Code Review',
-        'start_time': _selectedDate.copyWith(hour: 16, minute: 0),
-        'end_time': _selectedDate.copyWith(hour: 17, minute: 0),
-        'status': 'partial',
-        'priority': 2,
-        'is_locked': false,
-      },
-    ];
+      _notesController.text = _reflection['notes'] as String? ?? '';
+      _selectedMood = _reflection['mood'] as int?;
 
-    // Mock productivity streak
-    _productivityStreak = 7;
-
-    _notesController.text = _reflection['notes'] ?? '';
-    _selectedMood = _reflection['mood'];
-
-    setState(() {
-      _isLoading = false;
-      _hasChanges = false;
-    });
+      setState(() {
+        _hasChanges = false;
+      });
+    } catch (_) {
+      // Keep the screen usable even if data loading partially fails.
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
+
+  List<Map<String, dynamic>> _buildReflectionEvents(List<Event> all) {
+    final dayEvents = all
+        .where((e) => _isSameDay(e.startTime, _selectedDate))
+        .toList()
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    String mapStatus(EventStatus status) {
+      switch (status) {
+        case EventStatus.completed:
+          return 'completed';
+        case EventStatus.partial:
+          return 'partial';
+        case EventStatus.skipped:
+          return 'skipped';
+        default:
+          return 'pending';
+      }
+    }
+
+    return dayEvents.map((e) {
+      return {
+        'id': e.id,
+        'title': e.title,
+        'start_time': e.startTime,
+        'end_time': e.endTime,
+        'status': mapStatus(e.status),
+        'priority': _priorityToInt(e.priority),
+        'is_locked': false,
+      };
+    }).toList();
+  }
+
+  int _priorityToInt(EventPriority p) {
+    switch (p) {
+      case EventPriority.low:
+        return 1;
+      case EventPriority.medium:
+        return 2;
+      case EventPriority.high:
+        return 3;
+      case EventPriority.urgent:
+        return 4;
+    }
+  }
+
+  Map<String, String> _parseEventStatuses(List<String> tags) {
+    final out = <String, String>{};
+    for (final tag in tags) {
+      if (!tag.startsWith(_eventStatusTagPrefix)) continue;
+      final parts = tag.split(':');
+      if (parts.length >= 3) {
+        out[parts[1]] = parts[2];
+      }
+    }
+    return out;
+  }
+
+  List<String> _buildEventStatusTags() {
+    return _events
+        .map((e) => '$_eventStatusTagPrefix${e['id']}:${e['status']}')
+        .toList();
+  }
+
+  MoodRating? _moodFromInt(int? mood) {
+    if (mood == null) return null;
+    switch (mood) {
+      case 1:
+        return MoodRating.veryBad;
+      case 2:
+        return MoodRating.bad;
+      case 3:
+        return MoodRating.neutral;
+      case 4:
+        return MoodRating.good;
+      case 5:
+        return MoodRating.veryGood;
+      default:
+        return null;
+    }
+  }
+
+  int? _intFromMood(MoodRating? mood) => mood?.value;
 
   double get _completionRate {
     return StreakService.calculateDailyCompletionRate(_selectedDate, _events);
@@ -155,6 +213,19 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final productivityStreak =
+        ref.watch(streakProvider).valueOrNull?.currentStreak ?? 0;
+    final all = ref.watch(eventsProvider).valueOrNull ?? <Event>[];
+    final latest = _buildReflectionEvents(all);
+    final statusById = {
+      for (final e in _events) e['id'] as String: e['status'] as String,
+    };
+    _events = latest
+        .map((e) => {
+              ...e,
+              'status': statusById[e['id'] as String] ?? e['status'],
+            })
+        .toList();
     final isToday = _isSameDay(_selectedDate, DateTime.now());
 
     return Scaffold(
@@ -171,7 +242,9 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                isToday ? 'Today' : DateFormat('EEE, MMM d').format(_selectedDate),
+                isToday
+                    ? 'Today'
+                    : DateFormat('EEE, MMM d').format(_selectedDate),
                 style: theme.textTheme.headlineMedium,
               ),
               const SizedBox(width: 4),
@@ -195,7 +268,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                 slivers: [
                   // Streak card at the top
                   SliverToBoxAdapter(
-                    child: _buildStreakCard(context),
+                    child: _buildStreakCard(context, productivityStreak),
                   ),
 
                   // Stats section
@@ -230,7 +303,8 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                             style: theme.textTheme.titleLarge,
                           ),
                           TextButton(
-                            onPressed: () => context.go(AppRoutes.dayPath(_selectedDate)),
+                            onPressed: () =>
+                                context.go(AppRoutes.dayPath(_selectedDate)),
                             child: const Text('View Day'),
                           ),
                         ],
@@ -240,13 +314,15 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
 
                   // Events list with completion status buttons
                   SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
                           final event = _events[index];
                           return Padding(
-                            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                            padding:
+                                const EdgeInsets.only(bottom: AppSpacing.sm),
                             child: _buildEventWithStatusButtons(context, event),
                           );
                         },
@@ -263,7 +339,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
     );
   }
 
-  Widget _buildStreakCard(BuildContext context) {
+  Widget _buildStreakCard(BuildContext context, int productivityStreak) {
     final theme = Theme.of(context);
     final completionPercentage = (_completionRate * 100).toInt();
 
@@ -285,7 +361,7 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
-                  color: _productivityStreak > 0
+                  color: productivityStreak > 0
                       ? AppColors.warning.withValues(alpha: 0.1)
                       : context.csd.avatarBg,
                   borderRadius: BorderRadius.circular(AppRadius.md),
@@ -294,20 +370,20 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      _productivityStreak >= 30
+                      productivityStreak >= 30
                           ? Icons.whatshot
                           : Icons.local_fire_department,
                       size: 24,
-                      color: _productivityStreak > 0
+                      color: productivityStreak > 0
                           ? AppColors.warning
                           : AppColors.gray400,
                     ),
                     const SizedBox(width: AppSpacing.xs),
                     Text(
-                      '$_productivityStreak',
+                      '$productivityStreak',
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: _productivityStreak > 0
+                        color: productivityStreak > 0
                             ? context.csd.onSurface
                             : context.csd.onSurfaceDim,
                       ),
@@ -322,15 +398,13 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _productivityStreak == 1
-                          ? 'Day Streak'
-                          : 'Day Streak',
+                      productivityStreak == 1 ? 'Day Streak' : 'Day Streak',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
-                      StreakService.getStreakMessage(_productivityStreak),
+                      StreakService.getStreakMessage(productivityStreak),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: context.csd.onSurfaceDim,
                       ),
@@ -417,10 +491,12 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
     final completed = _events.where((e) => e['status'] == 'completed').length;
     final partial = _events.where((e) => e['status'] == 'partial').length;
     final skipped = _events.where((e) => e['status'] == 'skipped').length;
-    final pending = _events.where((e) =>
-        e['status'] != 'completed' &&
-        e['status'] != 'partial' &&
-        e['status'] != 'skipped').length;
+    final pending = _events
+        .where((e) =>
+            e['status'] != 'completed' &&
+            e['status'] != 'partial' &&
+            e['status'] != 'skipped')
+        .length;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -570,7 +646,9 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
                     Text(
                       _getMoodLabel(mood),
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: isSelected ? context.csd.onSurface : context.csd.onSurfaceDim,
+                        color: isSelected
+                            ? context.csd.onSurface
+                            : context.csd.onSurfaceDim,
                         fontWeight: isSelected ? FontWeight.w600 : null,
                       ),
                     ),
@@ -750,7 +828,9 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
             vertical: AppSpacing.xs,
           ),
           decoration: BoxDecoration(
-            color: isSelected ? color.withValues(alpha: 0.15) : context.csd.surface,
+            color: isSelected
+                ? color.withValues(alpha: 0.15)
+                : context.csd.surface,
             borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
               color: isSelected ? color : context.csd.border,
@@ -824,21 +904,38 @@ class _ReflectionScreenState extends ConsumerState<ReflectionScreen> {
   }
 
   Future<void> _saveReflection() async {
-    // TODO: Implement save to API
-    final reflectionData = {
-      'date': _selectedDate.toIso8601String(),
-      'notes': _notesController.text,
-      'mood': _selectedMood,
-      'events': _events.map((e) => {
-        'id': e['id'],
-        'status': e['status'],
-      }).toList(),
-    };
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null || userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to save reflection')),
+      );
+      return;
+    }
 
-    debugPrint('Saving reflection: $reflectionData');
+    final saved = await ref.read(reflectionActionsProvider).save(
+          DailyReflection(
+            id: 'reflection_${userId}_${DateFormat('yyyyMMdd').format(_selectedDate)}',
+            userId: userId,
+            date: DateTime(
+                _selectedDate.year, _selectedDate.month, _selectedDate.day),
+            mood: _moodFromInt(_selectedMood),
+            notes: _notesController.text.trim().isEmpty
+                ? null
+                : _notesController.text.trim(),
+            tags: _buildEventStatusTags(),
+            isComplete: true,
+          ),
+        );
+
+    if (!mounted) return;
+    if (saved == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to save reflection')),
+      );
+      return;
+    }
 
     setState(() => _hasChanges = false);
-
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Reflection saved')),
     );
@@ -862,7 +959,8 @@ class _ReflectionHistorySheet extends ConsumerWidget {
       DateTime.now().subtract(const Duration(days: 30)),
       DateTime.now(),
     );
-    final reflectionsAsync = ref.watch(reflectionsForDateRangeProvider(last30Days));
+    final reflectionsAsync =
+        ref.watch(reflectionsForDateRangeProvider(last30Days));
     final statsAsync = ref.watch(reflectionStatsProvider);
 
     return Column(
@@ -1058,8 +1156,7 @@ class _ReflectionHistorySheet extends ConsumerWidget {
                 },
               );
             },
-            loading: () =>
-                const Center(child: CircularProgressIndicator()),
+            loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('Error: $e')),
           ),
         ),
@@ -1120,15 +1217,15 @@ class _StatChip extends StatelessWidget {
             Text(
               value,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+                    fontWeight: FontWeight.w700,
+                  ),
             ),
             Text(
               label,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: context.csd.onSurfaceDim,
-                fontSize: 10,
-              ),
+                    color: context.csd.onSurfaceDim,
+                    fontSize: 10,
+                  ),
             ),
           ],
         ),

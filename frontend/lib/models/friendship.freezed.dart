@@ -33,6 +33,9 @@ mixin _$Friendship {
   bool get isFavorite => throw _privateConstructorUsedError;
   bool get isMuted => throw _privateConstructorUsedError;
   String? get sharedKey => throw _privateConstructorUsedError;
+
+  /// From friends list API; used as fallback when fetching encryption key.
+  String? get friendPublicKey => throw _privateConstructorUsedError;
   @JsonKey(name: 'streak_count')
   int get streakCount => throw _privateConstructorUsedError;
   @JsonKey(name: 'longest_streak')
@@ -64,6 +67,7 @@ abstract class $FriendshipCopyWith<$Res> {
       bool isFavorite,
       bool isMuted,
       String? sharedKey,
+      String? friendPublicKey,
       @JsonKey(name: 'streak_count') int streakCount,
       @JsonKey(name: 'longest_streak') int longestStreak});
 
@@ -97,6 +101,7 @@ class _$FriendshipCopyWithImpl<$Res, $Val extends Friendship>
     Object? isFavorite = null,
     Object? isMuted = null,
     Object? sharedKey = freezed,
+    Object? friendPublicKey = freezed,
     Object? streakCount = null,
     Object? longestStreak = null,
   }) {
@@ -152,6 +157,10 @@ class _$FriendshipCopyWithImpl<$Res, $Val extends Friendship>
       sharedKey: freezed == sharedKey
           ? _value.sharedKey
           : sharedKey // ignore: cast_nullable_to_non_nullable
+              as String?,
+      friendPublicKey: freezed == friendPublicKey
+          ? _value.friendPublicKey
+          : friendPublicKey // ignore: cast_nullable_to_non_nullable
               as String?,
       streakCount: null == streakCount
           ? _value.streakCount
@@ -211,6 +220,7 @@ abstract class _$$FriendshipImplCopyWith<$Res>
       bool isFavorite,
       bool isMuted,
       String? sharedKey,
+      String? friendPublicKey,
       @JsonKey(name: 'streak_count') int streakCount,
       @JsonKey(name: 'longest_streak') int longestStreak});
 
@@ -244,6 +254,7 @@ class __$$FriendshipImplCopyWithImpl<$Res>
     Object? isFavorite = null,
     Object? isMuted = null,
     Object? sharedKey = freezed,
+    Object? friendPublicKey = freezed,
     Object? streakCount = null,
     Object? longestStreak = null,
   }) {
@@ -300,6 +311,10 @@ class __$$FriendshipImplCopyWithImpl<$Res>
           ? _value.sharedKey
           : sharedKey // ignore: cast_nullable_to_non_nullable
               as String?,
+      friendPublicKey: freezed == friendPublicKey
+          ? _value.friendPublicKey
+          : friendPublicKey // ignore: cast_nullable_to_non_nullable
+              as String?,
       streakCount: null == streakCount
           ? _value.streakCount
           : streakCount // ignore: cast_nullable_to_non_nullable
@@ -329,6 +344,7 @@ class _$FriendshipImpl extends _Friendship {
       this.isFavorite = false,
       this.isMuted = false,
       this.sharedKey,
+      this.friendPublicKey,
       @JsonKey(name: 'streak_count') this.streakCount = 0,
       @JsonKey(name: 'longest_streak') this.longestStreak = 0})
       : super._();
@@ -365,6 +381,10 @@ class _$FriendshipImpl extends _Friendship {
   final bool isMuted;
   @override
   final String? sharedKey;
+
+  /// From friends list API; used as fallback when fetching encryption key.
+  @override
+  final String? friendPublicKey;
   @override
   @JsonKey(name: 'streak_count')
   final int streakCount;
@@ -374,7 +394,7 @@ class _$FriendshipImpl extends _Friendship {
 
   @override
   String toString() {
-    return 'Friendship(id: $id, requesterId: $requesterId, addresseeId: $addresseeId, status: $status, requester: $requester, addressee: $addressee, nickname: $nickname, createdAt: $createdAt, updatedAt: $updatedAt, acceptedAt: $acceptedAt, isFavorite: $isFavorite, isMuted: $isMuted, sharedKey: $sharedKey, streakCount: $streakCount, longestStreak: $longestStreak)';
+    return 'Friendship(id: $id, requesterId: $requesterId, addresseeId: $addresseeId, status: $status, requester: $requester, addressee: $addressee, nickname: $nickname, createdAt: $createdAt, updatedAt: $updatedAt, acceptedAt: $acceptedAt, isFavorite: $isFavorite, isMuted: $isMuted, sharedKey: $sharedKey, friendPublicKey: $friendPublicKey, streakCount: $streakCount, longestStreak: $longestStreak)';
   }
 
   @override
@@ -405,6 +425,8 @@ class _$FriendshipImpl extends _Friendship {
             (identical(other.isMuted, isMuted) || other.isMuted == isMuted) &&
             (identical(other.sharedKey, sharedKey) ||
                 other.sharedKey == sharedKey) &&
+            (identical(other.friendPublicKey, friendPublicKey) ||
+                other.friendPublicKey == friendPublicKey) &&
             (identical(other.streakCount, streakCount) ||
                 other.streakCount == streakCount) &&
             (identical(other.longestStreak, longestStreak) ||
@@ -428,6 +450,7 @@ class _$FriendshipImpl extends _Friendship {
       isFavorite,
       isMuted,
       sharedKey,
+      friendPublicKey,
       streakCount,
       longestStreak);
 
@@ -460,6 +483,7 @@ abstract class _Friendship extends Friendship {
           final bool isFavorite,
           final bool isMuted,
           final String? sharedKey,
+          final String? friendPublicKey,
           @JsonKey(name: 'streak_count') final int streakCount,
           @JsonKey(name: 'longest_streak') final int longestStreak}) =
       _$FriendshipImpl;
@@ -494,6 +518,10 @@ abstract class _Friendship extends Friendship {
   bool get isMuted;
   @override
   String? get sharedKey;
+  @override
+
+  /// From friends list API; used as fallback when fetching encryption key.
+  String? get friendPublicKey;
   @override
   @JsonKey(name: 'streak_count')
   int get streakCount;

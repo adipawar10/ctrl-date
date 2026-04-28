@@ -26,6 +26,7 @@ htmlcov/
 .ruff_cache/
 
 # Flutter/Dart
+frontend/.flutter_run.pid
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
@@ -63,6 +64,12 @@ frontend/android/**/GeneratedPluginRegistrant.*
 frontend/macos/Flutter/GeneratedPluginRegistrant.swift
 frontend/macos/Flutter/ephemeral/
 *.xcworkspace
+# CocoaPods macOS workspace must exist for `flutter run -d macos` (see frontend README).
+!frontend/macos/Runner.xcworkspace/
+!frontend/macos/Runner.xcworkspace/**
+# CocoaPods iOS workspace for Xcode / `flutter run` on simulator.
+!frontend/ios/Runner.xcworkspace/
+!frontend/ios/Runner.xcworkspace/**
 xcuserdata/
 *.xcscmblueprint
 *.xccheckout

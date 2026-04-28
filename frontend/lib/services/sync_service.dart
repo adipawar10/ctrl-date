@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,6 +25,8 @@ class SyncService {
 
   Timer? _syncTimer;
   bool _isSyncing = false;
+  bool _syncQueued = false;
+  Completer<SyncResult>? _activeSyncCompleter;
   DateTime? _lastSyncTime;
 
   final _syncStatusController = StreamController<SyncStatus>.broadcast();
@@ -56,58 +57,78 @@ class SyncService {
   /// Perform a full sync
   Future<SyncResult> sync() async {
     if (_isSyncing) {
-      return SyncResult(
-        success: false,
-        message: 'Sync already in progress',
-      );
+      _syncQueued = true;
+      return await (_activeSyncCompleter?.future ??
+          Future.value(
+            SyncResult(
+              success: true,
+              message: 'Sync already in progress, queued another run',
+            ),
+          ));
     }
 
     _isSyncing = true;
-    _syncStatusController.add(SyncStatus.syncing);
-
+    _activeSyncCompleter = Completer<SyncResult>();
     try {
-      // Step 1: Push local changes to server
-      final pushResult = await _pushLocalChanges();
-      if (!pushResult.success) {
-        _syncStatusController.add(SyncStatus.error);
-        return pushResult;
-      }
-
-      // Step 2: Pull remote changes
-      final pullResult = await _pullRemoteChanges();
-      if (!pullResult.success) {
-        _syncStatusController.add(SyncStatus.error);
-        return pullResult;
-      }
-
-      // Step 3: Resolve conflicts
-      final conflictResult = await _resolveConflicts();
-      if (!conflictResult.success) {
-        _syncStatusController.add(SyncStatus.error);
-        return conflictResult;
-      }
-
-      // Update last sync time
-      _lastSyncTime = DateTime.now();
-      await _saveLastSyncTime();
-
-      _syncStatusController.add(SyncStatus.synced);
-
-      return SyncResult(
+      SyncResult latestResult = SyncResult(
         success: true,
         message: 'Sync completed successfully',
-        itemsPushed: pushResult.itemsPushed,
-        itemsPulled: pullResult.itemsPulled,
-        conflictsResolved: conflictResult.conflictsResolved,
       );
+      do {
+        _syncQueued = false;
+        _syncStatusController.add(SyncStatus.syncing);
+
+        // Step 1: Push local changes to server
+        final pushResult = await _pushLocalChanges();
+        if (!pushResult.success) {
+          _syncStatusController.add(SyncStatus.error);
+          _activeSyncCompleter?.complete(pushResult);
+          return pushResult;
+        }
+
+        // Step 2: Pull remote changes
+        final pullResult = await _pullRemoteChanges();
+        if (!pullResult.success) {
+          _syncStatusController.add(SyncStatus.error);
+          _activeSyncCompleter?.complete(pullResult);
+          return pullResult;
+        }
+
+        // Step 3: Resolve conflicts
+        final conflictResult = await _resolveConflicts();
+        if (!conflictResult.success) {
+          _syncStatusController.add(SyncStatus.error);
+          _activeSyncCompleter?.complete(conflictResult);
+          return conflictResult;
+        }
+
+        // Update last sync time
+        _lastSyncTime = DateTime.now();
+        await _saveLastSyncTime();
+
+        latestResult = SyncResult(
+          success: true,
+          message: 'Sync completed successfully',
+          itemsPushed: pushResult.itemsPushed,
+          itemsPulled: pullResult.itemsPulled,
+          conflictsResolved: conflictResult.conflictsResolved,
+        );
+      } while (_syncQueued);
+
+      _syncStatusController.add(SyncStatus.synced);
+      _activeSyncCompleter?.complete(latestResult);
+      return latestResult;
     } catch (e) {
       _syncStatusController.add(SyncStatus.error);
-      return SyncResult(
+      final errorResult = SyncResult(
         success: false,
         message: 'Sync failed: ${e.toString()}',
       );
+      _activeSyncCompleter?.complete(errorResult);
+      return errorResult;
     } finally {
       _isSyncing = false;
+      _activeSyncCompleter = null;
     }
   }
 
@@ -120,8 +141,18 @@ class SyncService {
     int itemsPushed = 0;
 
     try {
-      // Get unsynced events
-      final unsyncedEvents = await _database!.getUnsyncedEvents();
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) {
+        return SyncResult(
+          success: true,
+          message: 'Not signed in',
+          itemsPushed: 0,
+        );
+      }
+
+      // Get unsynced events for this account only
+      final unsyncedEvents =
+          await _database!.getUnsyncedEventsForUserId(userId);
 
       for (final event in unsyncedEvents) {
         final eventData = _prepareEventForSync(event);
@@ -140,22 +171,31 @@ class SyncService {
         }
       }
 
-      // Get unsynced reflections
-      final unsyncedReflections = await _database!.getUnsyncedReflections();
+      // Get unsynced reflections for this account only
+      final unsyncedReflections =
+          await _database!.getUnsyncedReflectionsForUserId(userId);
 
       for (final reflection in unsyncedReflections) {
         final reflectionData = _prepareReflectionForSync(reflection);
+        final reflectionDate =
+            reflection.date.toIso8601String().split('T').first;
+        final eventStats = _deriveReflectionEventStats(reflection);
 
         final response = await _api.post(
-          '/reflections',
-          body: reflectionData,
+          '/reflections/$reflectionDate',
+          body: {
+            'notes': reflection.notes,
+            'mood': reflection.mood?.value,
+            ...eventStats,
+          },
         );
 
         if (response.isSuccess) {
           await _database!.markReflectionSynced(reflection.id);
           itemsPushed++;
         } else {
-          await _storePendingChange('reflection', reflection.id, reflectionData);
+          await _storePendingChange(
+              'reflection', reflection.id, reflectionData);
         }
       }
 
@@ -184,44 +224,89 @@ class SyncService {
     int itemsPulled = 0;
 
     try {
-      final since = _lastSyncTime?.toIso8601String();
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) {
+        return SyncResult(
+          success: true,
+          message: 'Not signed in',
+          itemsPulled: 0,
+        );
+      }
+
+      final now = DateTime.now();
+      final eventRangeStart = now.subtract(const Duration(days: 30));
+      final eventRangeEnd = now.add(const Duration(days: 365));
 
       // Pull events
-      final eventsResponse = await _api.get<List>(
+      final eventsResponse = await _api.get<Map<String, dynamic>>(
         '/events',
-        queryParams: since != null ? {'updated_since': since} : null,
+        queryParams: {
+          'start': eventRangeStart.toIso8601String(),
+          'end': eventRangeEnd.toIso8601String(),
+        },
       );
 
       if (eventsResponse.isSuccess && eventsResponse.data != null) {
-        for (final eventJson in eventsResponse.data!) {
-          final event = Event.fromJson(eventJson as Map<String, dynamic>);
+        final remoteEventsRaw = (eventsResponse.data!['events'] as List?) ?? [];
+        final remoteEventMaps =
+            remoteEventsRaw.whereType<Map<String, dynamic>>().toList()
+              ..sort((a, b) {
+                final aIsInstance =
+                    (a['recurrence_parent_id']?.toString().isNotEmpty ?? false);
+                final bIsInstance =
+                    (b['recurrence_parent_id']?.toString().isNotEmpty ?? false);
+                if (aIsInstance == bIsInstance) return 0;
+                return aIsInstance ? 1 : -1; // parent/base events first
+              });
 
-          // Decrypt if needed
-          final decryptedEvent = await _decryptEventIfNeeded(event);
+        for (final eventJson in remoteEventMaps) {
+          try {
+            final event = _eventFromApi(eventJson);
+            if (event.userId != userId) continue;
 
-          // Check for local version
-          final localEvent = await _database!.getEventById(event.id);
+            // Decrypt if needed
+            final decryptedEvent = await _decryptEventIfNeeded(event);
 
-          if (localEvent == null) {
-            await _database!.insertEvent(decryptedEvent);
-            itemsPulled++;
-          } else if (_shouldUpdateLocal(localEvent, decryptedEvent)) {
-            await _database!.updateEvent(decryptedEvent);
-            itemsPulled++;
+            // Check for local version
+            final localEvent = await _database!.getEventById(event.id);
+
+            if (localEvent == null) {
+              await _database!.insertEvent(decryptedEvent);
+              itemsPulled++;
+            } else if (_shouldUpdateLocal(localEvent, decryptedEvent)) {
+              await _database!.updateEvent(
+                _mergePulledEvent(localEvent, decryptedEvent),
+              );
+              itemsPulled++;
+            }
+          } catch (e) {
+            debugPrint('Skipping malformed/failed event during pull: $e');
           }
         }
       }
 
       // Pull reflections
-      final reflectionsResponse = await _api.get<List>(
+      final reflectionsResponse = await _api.get<Map<String, dynamic>>(
         '/reflections',
-        queryParams: since != null ? {'updated_since': since} : null,
+        queryParams: {
+          'start_date': DateTime(now.year, now.month, now.day)
+              .subtract(const Duration(days: 30))
+              .toIso8601String()
+              .split('T')[0],
+          'end_date': DateTime(now.year, now.month, now.day)
+              .add(const Duration(days: 365))
+              .toIso8601String()
+              .split('T')[0],
+        },
       );
 
       if (reflectionsResponse.isSuccess && reflectionsResponse.data != null) {
-        for (final reflectionJson in reflectionsResponse.data!) {
+        final remoteReflections =
+            (reflectionsResponse.data!['reflections'] as List?) ?? [];
+        for (final reflectionJson in remoteReflections) {
           final reflection =
-              DailyReflection.fromJson(reflectionJson as Map<String, dynamic>);
+              _reflectionFromApi(reflectionJson as Map<String, dynamic>);
+          if (reflection.userId != userId) continue;
 
           // Decrypt if needed
           final decryptedReflection =
@@ -253,6 +338,149 @@ class SyncService {
     }
   }
 
+  /// Remote payloads often omit nested recurrence/reminders; avoid wiping local
+  /// columns on merge.
+  Event _mergePulledEvent(Event local, Event remote) {
+    return remote.copyWith(
+      recurrenceRule: remote.recurrenceRule ?? local.recurrenceRule,
+      reminders:
+          remote.reminders.isNotEmpty ? remote.reminders : local.reminders,
+      attachments: remote.attachments.isNotEmpty
+          ? remote.attachments
+          : local.attachments,
+    );
+  }
+
+  Event _eventFromApi(Map<String, dynamic> json) {
+    // Backend timestamps may include UTC offsets. Convert to local so calendar
+    // UI always renders the user's local wall-clock time.
+    final start =
+        DateTime.parse((json['start_time'] ?? json['startTime']) as String)
+            .toLocal();
+    final end = DateTime.parse((json['end_time'] ?? json['endTime']) as String)
+        .toLocal();
+    final statusRaw = (json['status'] ?? 'scheduled').toString();
+    final priorityRaw = json['priority'];
+    final priority = switch (priorityRaw) {
+      int p when p <= 1 => EventPriority.low,
+      int p when p == 2 => EventPriority.medium,
+      int p when p == 3 => EventPriority.high,
+      int p when p >= 4 => EventPriority.urgent,
+      String s when s == 'low' => EventPriority.low,
+      String s when s == 'high' => EventPriority.high,
+      String s when s == 'urgent' => EventPriority.urgent,
+      _ => EventPriority.medium,
+    };
+    final status = EventStatus.values.firstWhere(
+      (s) => s.name == statusRaw || s.name == statusRaw.replaceAll('_', ''),
+      orElse: () {
+        switch (statusRaw) {
+          case 'in_progress':
+            return EventStatus.inProgress;
+          default:
+            return EventStatus.scheduled;
+        }
+      },
+    );
+
+    RecurrenceRule? recurrenceRule;
+    final recurrenceRaw = json['recurrence_rule'] ?? json['recurrenceRule'];
+    if (recurrenceRaw is Map<String, dynamic>) {
+      final normalized = Map<String, dynamic>.from(recurrenceRaw);
+      if (normalized['byWeekDay'] == null &&
+          (normalized['by_weekday'] ?? normalized['by_week_day']) != null) {
+        normalized['byWeekDay'] =
+            (normalized['by_weekday'] ?? normalized['by_week_day']) as List;
+      }
+      if (normalized['byMonthDay'] == null &&
+          normalized['by_monthday'] != null) {
+        normalized['byMonthDay'] = normalized['by_monthday'] as List;
+      }
+      if (normalized['byMonth'] == null && normalized['by_month'] != null) {
+        normalized['byMonth'] = normalized['by_month'] as List;
+      }
+      if (normalized['until'] == null && normalized['until_date'] != null) {
+        normalized['until'] = normalized['until_date'];
+      }
+      try {
+        recurrenceRule = RecurrenceRule.fromJson(normalized);
+      } catch (_) {
+        recurrenceRule = null;
+      }
+    }
+
+    return Event(
+      id: (json['id'] ?? '').toString(),
+      userId: (json['owner_id'] ?? json['userId'] ?? '').toString(),
+      title: (json['title'] ?? 'Untitled event').toString(),
+      description: json['description']?.toString(),
+      startTime: start,
+      endTime: end,
+      isAllDay:
+          (json['all_day'] as bool?) ?? (json['isAllDay'] as bool?) ?? false,
+      location: json['location']?.toString(),
+      status: status,
+      priority: priority,
+      color: json['color']?.toString(),
+      tags: ((json['tags'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList(),
+      recurrenceRule: recurrenceRule,
+      parentEventId:
+          (json['recurrence_parent_id'] ?? json['parentEventId'])?.toString(),
+      isPrivate: (json['is_private'] as bool?) ?? false,
+      encryptedData: json['encrypted_data']?.toString(),
+      isShared: (json['is_shared'] as bool?) ?? false,
+      sharedWithUserIds: ((json['shared_with_user_ids'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList(),
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+      updatedAt: json['updated_at'] != null
+          ? DateTime.tryParse(json['updated_at'].toString())
+          : null,
+      isSynced: true,
+    );
+  }
+
+  DailyReflection _reflectionFromApi(Map<String, dynamic> json) {
+    MoodRating? moodFromInt(dynamic value) {
+      if (value is! int) return null;
+      for (final mood in MoodRating.values) {
+        if (mood.value == value) return mood;
+      }
+      return null;
+    }
+
+    return DailyReflection(
+      id: (json['id'] ?? '').toString(),
+      userId: (json['user_id'] ?? json['userId'] ?? '').toString(),
+      date: DateTime.parse(
+        (json['reflection_date'] ?? json['date']).toString(),
+      ),
+      mood: moodFromInt(json['mood']),
+      gratitude: json['gratitude']?.toString(),
+      accomplishments: json['accomplishments']?.toString(),
+      challenges: json['challenges']?.toString(),
+      learnings: json['learnings']?.toString(),
+      notes: json['notes']?.toString(),
+      tags: ((json['tags'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList(),
+      isPrivate: (json['is_private'] as bool?) ?? false,
+      encryptedData: json['encrypted_data']?.toString(),
+      isComplete: (json['is_complete'] as bool?) ?? false,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+      updatedAt: json['updated_at'] != null
+          ? DateTime.tryParse(json['updated_at'].toString())
+          : null,
+      isSynced: true,
+    );
+  }
+
   /// Resolve conflicts between local and remote data
   Future<SyncResult> _resolveConflicts() async {
     // Conflict resolution strategy:
@@ -273,7 +501,40 @@ class SyncService {
 
   /// Prepare event data for sync (encrypt if private)
   Map<String, dynamic> _prepareEventForSync(Event event) {
-    var data = event.toJson();
+    final priorityInt = switch (event.priority) {
+      EventPriority.low => 1,
+      EventPriority.medium => 2,
+      EventPriority.high => 3,
+      EventPriority.urgent => 4,
+    };
+
+    final data = <String, dynamic>{
+      'title': event.title,
+      'description': event.description,
+      'location': event.location,
+      'start_time': event.startTime.toUtc().toIso8601String(),
+      'end_time': event.endTime.toUtc().toIso8601String(),
+      'all_day': event.isAllDay,
+      'timezone': DateTime.now().timeZoneName,
+      'is_locked': false,
+      'priority': priorityInt,
+      'color': event.color,
+      'tags': event.tags,
+    };
+
+    if (event.recurrenceRule != null) {
+      final r = event.recurrenceRule!;
+      data['recurrence_rule'] = {
+        'frequency': r.frequency.name,
+        'interval': r.interval,
+        'by_weekday': r.byWeekDay,
+        'by_monthday': r.byMonthDay,
+        'by_month': r.byMonth,
+        'count': r.count,
+        if (r.until != null)
+          'until_date': r.until!.toIso8601String().split('T').first,
+      };
+    }
 
     if (event.isPrivate) {
       // Encrypt sensitive fields
@@ -281,7 +542,6 @@ class SyncService {
         'title': event.title,
         'description': event.description,
         'location': event.location,
-        'notes': data['notes'],
       };
 
       final encrypted = _encryption.encryptData(jsonEncode(sensitiveData));
@@ -289,7 +549,6 @@ class SyncService {
       data['title'] = 'Private Event';
       data['description'] = null;
       data['location'] = null;
-      data.remove('notes');
     }
 
     return data;
@@ -298,6 +557,7 @@ class SyncService {
   /// Prepare reflection data for sync (encrypt if private)
   Map<String, dynamic> _prepareReflectionForSync(DailyReflection reflection) {
     var data = reflection.toJson();
+    data.addAll(_deriveReflectionEventStats(reflection));
 
     if (reflection.isPrivate) {
       final sensitiveData = {
@@ -414,8 +674,20 @@ class SyncService {
       final type = change['type'] as String;
       final data = change['data'] as Map<String, dynamic>;
 
-      final endpoint = type == 'event' ? '/events' : '/reflections';
-      final response = await _api.post(endpoint, body: data);
+      final endpoint = type == 'event'
+          ? '/events'
+          : '/reflections/${_reflectionDateFromPendingData(data)}';
+      final body = type == 'event'
+          ? data
+          : {
+              'notes': data['notes'],
+              'mood': data['mood'],
+              'events_planned': data['events_planned'],
+              'events_completed': data['events_completed'],
+              'events_skipped': data['events_skipped'],
+              'events_partial': data['events_partial'],
+            };
+      final response = await _api.post(endpoint, body: body);
 
       if (!response.isSuccess) {
         remaining.add(change as Map<String, dynamic>);
@@ -427,6 +699,47 @@ class SyncService {
     } else {
       await prefs.setString(_pendingChangesKey, jsonEncode(remaining));
     }
+  }
+
+  String _reflectionDateFromPendingData(Map<String, dynamic> data) {
+    final rawDate = data['date']?.toString();
+    if (rawDate == null || rawDate.isEmpty) {
+      return DateTime.now().toIso8601String().split('T').first;
+    }
+    final parsed = DateTime.tryParse(rawDate);
+    return (parsed ?? DateTime.now()).toIso8601String().split('T').first;
+  }
+
+  Map<String, int> _deriveReflectionEventStats(DailyReflection reflection) {
+    var planned = 0;
+    var completed = 0;
+    var skipped = 0;
+    var partial = 0;
+
+    for (final tag in reflection.tags) {
+      if (!tag.startsWith('event_status:')) continue;
+      final parts = tag.split(':');
+      if (parts.length < 3) continue;
+      planned += 1;
+      switch (parts[2]) {
+        case 'completed':
+          completed += 1;
+          break;
+        case 'skipped':
+          skipped += 1;
+          break;
+        case 'partial':
+          partial += 1;
+          break;
+      }
+    }
+
+    return {
+      'events_planned': planned,
+      'events_completed': completed,
+      'events_skipped': skipped,
+      'events_partial': partial,
+    };
   }
 
   /// Load the last sync time from storage

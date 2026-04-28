@@ -7,6 +7,7 @@ import '../models/inbox.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import 'events_provider.dart';
+import '../models/user.dart';
 
 /// Provider for inbox messages
 final inboxProvider =
@@ -64,6 +65,69 @@ class InboxNotifier extends StateNotifier<InboxState> {
 
   bool _initialLoadDone = false;
 
+  InboxMessage _fromBackendMessage(Map<String, dynamic> json) {
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id ?? '';
+    final senderId = (json['sender_id'] ?? '') as String;
+    final recipientId = (json['recipient_id'] ?? currentUserId) as String;
+    final rawType = (json['message_type'] ?? 'system').toString();
+
+    MessageType type;
+    switch (rawType) {
+      case 'text':
+        type = MessageType.text;
+        break;
+      case 'event_share':
+        type = MessageType.eventShare;
+        break;
+      case 'poke':
+        type = MessageType.poke;
+        break;
+      case 'friend_request':
+        type = MessageType.friendRequest;
+        break;
+      case 'friend_accepted':
+        type = MessageType.friendAccepted;
+        break;
+      default:
+        type = MessageType.system;
+    }
+
+    final senderName = (json['sender_display_name'] ?? 'Unknown').toString();
+    final recipientName =
+        (json['recipient_display_name'] ?? 'Unknown').toString();
+    final body = (json['ciphertext'] ?? '').toString();
+
+    final isMine = senderId == currentUserId;
+    final counterpartId = isMine ? recipientId : senderId;
+    final counterpartName = isMine ? recipientName : senderName;
+    final counterpartAvatar = isMine
+        ? json['recipient_avatar_url'] as String?
+        : json['sender_avatar_url'] as String?;
+
+    return InboxMessage(
+      id: (json['id'] ?? '').toString(),
+      userId: currentUserId,
+      type: type,
+      title:
+          rawType == 'text' ? counterpartName : rawType.replaceAll('_', ' '),
+      body: body,
+      senderId: senderId,
+      sender: UserProfile(
+        id: counterpartId,
+        displayName: counterpartName,
+        avatarUrl: counterpartAvatar,
+      ),
+      isRead: json['is_read'] as bool? ?? false,
+      createdAt: DateTime.tryParse((json['created_at'] ?? '').toString()),
+      data: {
+        'recipientId': recipientId,
+        'counterpartId': counterpartId,
+        'counterpartName': counterpartName,
+      },
+    );
+  }
+
+
   Future<void> _loadMessages({bool refresh = false}) async {
     if (_initialLoadDone && !refresh && state.isLoading) return;
     _initialLoadDone = true;
@@ -96,12 +160,12 @@ class InboxNotifier extends StateNotifier<InboxState> {
         final data = response.data!;
         final messagesJson = data['messages'] as List? ?? [];
         final messages = messagesJson
-            .map((json) => InboxMessage.fromJson(json as Map<String, dynamic>))
+            .map((json) => _fromBackendMessage(json as Map<String, dynamic>))
             .toList();
 
         state = state.copyWith(
           messages: messages,
-          unreadCount: data['unread_count'] as int? ?? 0,
+          unreadCount: messages.where((m) => !m.isRead).length,
           hasMore: messages.length >= _pageSize,
           isLoading: false,
         );
@@ -138,7 +202,7 @@ class InboxNotifier extends StateNotifier<InboxState> {
         final data = response.data!;
         final messagesJson = data['messages'] as List? ?? [];
         final newMessages = messagesJson
-            .map((json) => InboxMessage.fromJson(json as Map<String, dynamic>))
+            .map((json) => _fromBackendMessage(json as Map<String, dynamic>))
             .toList();
 
         state = state.copyWith(
@@ -177,7 +241,7 @@ class InboxNotifier extends StateNotifier<InboxState> {
   }
 
   void _handleNewMessage(Map<String, dynamic> messageData) {
-    final message = InboxMessage.fromJson(messageData);
+    final message = _fromBackendMessage(messageData);
 
     // Add to state
     state = state.copyWith(
@@ -190,7 +254,7 @@ class InboxNotifier extends StateNotifier<InboxState> {
   }
 
   void _handleMessageUpdate(Map<String, dynamic> messageData) {
-    final updatedMessage = InboxMessage.fromJson(messageData);
+    final updatedMessage = _fromBackendMessage(messageData);
 
     final updatedMessages = state.messages.map((m) {
       if (m.id == updatedMessage.id) {
@@ -218,10 +282,7 @@ class InboxNotifier extends StateNotifier<InboxState> {
   /// Mark a message as read
   Future<void> markAsRead(String messageId) async {
     try {
-      await _api.patch(
-        '/inbox/$messageId',
-        body: {'is_read': true},
-      );
+      await _api.put('/inbox/$messageId/read');
 
       final updatedMessages = state.messages.map((m) {
         if (m.id == messageId) {
@@ -245,7 +306,7 @@ class InboxNotifier extends StateNotifier<InboxState> {
   /// Mark all messages as read
   Future<void> markAllAsRead() async {
     try {
-      await _api.post('/inbox/mark-all-read');
+      await _api.post('/inbox/read-all');
 
       final updatedMessages = state.messages.map((m) {
         if (!m.isRead) {
@@ -269,11 +330,6 @@ class InboxNotifier extends StateNotifier<InboxState> {
   /// Archive a message
   Future<void> archiveMessage(String messageId) async {
     try {
-      await _api.patch(
-        '/inbox/$messageId',
-        body: {'is_archived': true},
-      );
-
       final updatedMessages = state.messages.map((m) {
         if (m.id == messageId) {
           return m.copyWith(isArchived: true);
@@ -290,11 +346,6 @@ class InboxNotifier extends StateNotifier<InboxState> {
   /// Unarchive a message
   Future<void> unarchiveMessage(String messageId) async {
     try {
-      await _api.patch(
-        '/inbox/$messageId',
-        body: {'is_archived': false},
-      );
-
       final updatedMessages = state.messages.map((m) {
         if (m.id == messageId) {
           return m.copyWith(isArchived: false);

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ctrl_shift_date/services/weather_service.dart';
+import 'package:ctrl_shift_date/utils/weather_icons.dart';
 
 void main() {
   group('WeatherCondition', () {
@@ -9,7 +10,7 @@ void main() {
   });
 
   group('DayWeather', () {
-    test('icon returns correct emoji for sunny', () {
+    test('icon returns emoji string for tooltips/legacy', () {
       final w = DayWeather(
         date: DateTime(2026, 4, 1),
         tempHigh: 25,
@@ -20,51 +21,7 @@ void main() {
       expect(w.icon, '☀️');
     });
 
-    test('icon returns correct emoji for rainy', () {
-      final w = DayWeather(
-        date: DateTime(2026, 4, 1),
-        tempHigh: 18,
-        tempLow: 12,
-        condition: WeatherCondition.rainy,
-        description: 'Rain',
-      );
-      expect(w.icon, '🌧️');
-    });
-
-    test('icon returns correct emoji for snowy', () {
-      final w = DayWeather(
-        date: DateTime(2026, 4, 1),
-        tempHigh: -2,
-        tempLow: -8,
-        condition: WeatherCondition.snowy,
-        description: 'Snowfall',
-      );
-      expect(w.icon, '❄️');
-    });
-
-    test('icon for thunderstorm', () {
-      final w = DayWeather(
-        date: DateTime(2026, 4, 1),
-        tempHigh: 20,
-        tempLow: 15,
-        condition: WeatherCondition.thunderstorm,
-        description: 'Storm',
-      );
-      expect(w.icon, '⛈️');
-    });
-
-    test('icon for unknown', () {
-      final w = DayWeather(
-        date: DateTime(2026, 4, 1),
-        tempHigh: 20,
-        tempLow: 15,
-        condition: WeatherCondition.unknown,
-        description: 'Unknown',
-      );
-      expect(w.icon, '🌡️');
-    });
-
-    test('tempRange formats correctly', () {
+    test('tempRange formats min then max', () {
       final w = DayWeather(
         date: DateTime(2026, 4, 1),
         tempHigh: 25.6,
@@ -72,7 +29,7 @@ void main() {
         condition: WeatherCondition.sunny,
         description: 'Clear',
       );
-      expect(w.tempRange, '26°/14°');
+      expect(w.tempRange, '14°/26°');
     });
 
     test('humidity and windSpeed default to 0', () {
@@ -88,23 +45,24 @@ void main() {
     });
   });
 
-  group('WeatherService._mapWeatherCode (via condition mapping)', () {
-    // We test the weather code mapping indirectly by verifying
-    // the WeatherCondition enum covers all expected scenarios
-    test('all weather icon types have unique emojis', () {
-      final icons = <String>{};
+  group('weatherIconFor', () {
+    test('each condition maps to a distinct Material icon', () {
+      final codePoints = <int>{};
       for (final condition in WeatherCondition.values) {
-        final w = DayWeather(
-          date: DateTime(2026, 4, 1),
-          tempHigh: 20,
-          tempLow: 10,
-          condition: condition,
-          description: 'test',
-        );
-        icons.add(w.icon);
+        codePoints.add(weatherIconFor(condition).codePoint);
       }
-      // All conditions should produce a non-empty icon
-      expect(icons.length, WeatherCondition.values.length);
+      expect(codePoints.length, WeatherCondition.values.length);
+    });
+
+    test('DayWeather extension matches condition', () {
+      final w = DayWeather(
+        date: DateTime(2026, 4, 1),
+        tempHigh: 20,
+        tempLow: 10,
+        condition: WeatherCondition.rainy,
+        description: 'Rain',
+      );
+      expect(w.weatherIconData, weatherIconFor(WeatherCondition.rainy));
     });
   });
 }

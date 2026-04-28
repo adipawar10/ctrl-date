@@ -26,8 +26,8 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
   late DateTime _weekStart;
   late ScrollController _verticalScrollController;
   final double _hourHeight = 50.0;
-  final int _startHour = 6;
-  final int _endHour = 22;
+  final int _startHour = 0;
+  final int _endHour = 24;
 
   // Mock events - replace with actual state management
   final Map<String, List<Map<String, dynamic>>> _eventsByDay = {};

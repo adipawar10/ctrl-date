@@ -15,7 +15,7 @@ class AppConstants {
   static const String supabaseUrl = 'https://qsinqjlxfvkguagpaqdf.supabase.co';
   static const String supabaseAnonKey = 'sb_publishable_qTzpzY8e785uuv4y1tEvTA_5TROfz7q';
 
-  /// API configuration
+  /// Legacy default; runtime URL is resolved in [ApiEndpoints].
   static const String apiBaseUrl = 'http://localhost:8000';
   static const Duration apiTimeout = Duration(seconds: 30);
 
@@ -309,4 +309,9 @@ class StorageKeys {
   static const String themeMode = 'theme_mode';
   static const String encryptionPrivateKey = 'encryption_private_key';
   static const String encryptionPublicKey = 'encryption_public_key';
+
+  /// Last-known coordinates for calendar weather (Open-Meteo).
+  static const String weatherUseDeviceLocation = 'weather_use_device_location';
+  static const String weatherLatitude = 'weather_latitude';
+  static const String weatherLongitude = 'weather_longitude';
 }

@@ -49,6 +49,8 @@ class Friendship with _$Friendship {
     @Default(false) bool isFavorite,
     @Default(false) bool isMuted,
     String? sharedKey,
+    /// From friends list API; used as fallback when fetching encryption key.
+    String? friendPublicKey,
     @Default(0) @JsonKey(name: 'streak_count') int streakCount,
     @Default(0) @JsonKey(name: 'longest_streak') int longestStreak,
   }) = _Friendship;

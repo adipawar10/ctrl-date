@@ -158,6 +158,7 @@ class FriendshipsNotifier extends StateNotifier<AsyncValue<List<Friendship>>> {
       acceptedAt: json['accepted_at'] != null
           ? DateTime.tryParse(json['accepted_at'] as String)
           : null,
+      friendPublicKey: json['public_key'] as String?,
       streakCount: json['streak_count'] as int? ?? 0,
       longestStreak: json['longest_streak'] as int? ?? 0,
     );

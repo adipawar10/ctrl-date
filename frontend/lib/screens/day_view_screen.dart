@@ -31,8 +31,8 @@ class _DayViewScreenState extends ConsumerState<DayViewScreen> {
   late DateTime _selectedDate;
   late ScrollController _scrollController;
   final double _hourHeight = 60.0;
-  final int _startHour = 6;
-  final int _endHour = 22;
+  final int _startHour = 0;
+  final int _endHour = 24;
 
   @override
   void initState() {

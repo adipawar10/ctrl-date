@@ -61,6 +61,15 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
   );
 });
 
+/// Supabase user id when signed in; null when signed out. Use to scope local DB rows.
+final currentUserIdProvider = Provider<String?>((ref) {
+  final authState = ref.watch(authStateProvider);
+  return authState.maybeWhen(
+    data: (user) => user?.id,
+    orElse: () => null,
+  );
+});
+
 /// Provider for user preferences
 final userPreferencesProvider =
     StateNotifierProvider<UserPreferencesNotifier, UserPreferences>((ref) {
@@ -171,6 +180,17 @@ class AuthActions {
   AuthService get _authService => _ref.read(authServiceProvider);
   EncryptionService get _encryptionService => EncryptionService.instance;
 
+  Future<void> _syncPublicKeyToBackend() async {
+    try {
+      await _encryptionService.initialize();
+      final publicKey = await _encryptionService.getPublicKey();
+      final api = ApiService.instance;
+      await api.put('/auth/public-key', body: {'public_key': publicKey});
+    } catch (_) {
+      // Non-blocking: messaging can retry key lookup later.
+    }
+  }
+
   /// Sign up with email and password
   Future<AuthResult> signUpWithEmail({
     required String email,
@@ -184,11 +204,7 @@ class AuthActions {
     );
 
     if (result.isSuccess && result.user != null) {
-      // Initialize encryption keys for the new user
-      await _encryptionService.initialize();
-      final publicKey = await _encryptionService.getPublicKey();
-
-      // Store public key in user profile
+      await _syncPublicKeyToBackend();
       await _authService.updateProfile(
         displayName: displayName,
       );
@@ -208,8 +224,7 @@ class AuthActions {
     );
 
     if (result.isSuccess) {
-      // Initialize encryption service
-      await _encryptionService.initialize();
+      await _syncPublicKeyToBackend();
     }
 
     return result;
@@ -266,7 +281,11 @@ class AuthActions {
 
   /// Refresh session
   Future<AuthResult> refreshSession() async {
-    return _authService.refreshSession();
+    final result = await _authService.refreshSession();
+    if (result.isSuccess) {
+      await _syncPublicKeyToBackend();
+    }
+    return result;
   }
 
   /// Delete account
@@ -274,7 +293,7 @@ class AuthActions {
     try {
       // Call backend to delete all user data
       final api = ApiService.instance;
-      final response = await api.delete('/auth/account');
+      await api.delete('/auth/account');
 
       // Clear all local data regardless of server response
       await _clearAllLocalData();

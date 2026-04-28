@@ -2,6 +2,8 @@
 /// Cross-platform productivity app with intelligent scheduling
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -59,6 +61,8 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
     _load();
   }
 
+  Timer? _persistTimer;
+
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final value = prefs.getString('theme_mode');
@@ -70,10 +74,23 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
     }
   }
 
+  /// Updates theme immediately; persists after a short debounce so rapid
+  /// toggles do not stack async work that can race with rebuilds.
   Future<void> setThemeMode(ThemeMode mode) async {
+    if (state == mode) return;
     state = mode;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('theme_mode', mode.name);
+    _persistTimer?.cancel();
+    final persisted = mode;
+    _persistTimer = Timer(const Duration(milliseconds: 200), () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('theme_mode', persisted.name);
+    });
+  }
+
+  @override
+  void dispose() {
+    _persistTimer?.cancel();
+    super.dispose();
   }
 }
 
@@ -89,22 +106,43 @@ class _CtrlShiftDateAppState extends ConsumerState<CtrlShiftDateApp> {
   bool _checkedForUpdates = false;
 
   @override
+  void initState() {
+    super.initState();
+    // One-shot: do not schedule post-frame work on every rebuild (e.g. theme
+    // toggles), which could stack callbacks and trigger framework assertions.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tryShowWhatsNew());
+  }
+
+  void _tryShowWhatsNew() {
+    if (!mounted || _checkedForUpdates) return;
+    final onboarding = ref.read(onboardingProvider);
+    if (onboarding.isLoading ||
+        !onboarding.isComplete ||
+        !onboarding.hasNewUpdate) {
+      return;
+    }
+    _checkedForUpdates = true;
+    final ctx = appRouter.routerDelegate.navigatorKey.currentContext;
+    if (ctx != null) {
+      WhatsNewDialog.show(ctx);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
-    final onboardingState = ref.watch(onboardingProvider);
 
-    // Show What's New dialog for returning users with updates
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_checkedForUpdates &&
-          !onboardingState.isLoading &&
-          onboardingState.isComplete &&
-          onboardingState.hasNewUpdate) {
-        _checkedForUpdates = true;
+    ref.listen(onboardingProvider, (previous, next) {
+      if (_checkedForUpdates) return;
+      if (next.isLoading || !next.isComplete || !next.hasNewUpdate) return;
+      _checkedForUpdates = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         final ctx = appRouter.routerDelegate.navigatorKey.currentContext;
         if (ctx != null) {
           WhatsNewDialog.show(ctx);
         }
-      }
+      });
     });
 
     return MaterialApp.router(
@@ -115,6 +153,8 @@ class _CtrlShiftDateAppState extends ConsumerState<CtrlShiftDateApp> {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
+      // Avoid animated theme cross-fade stacking when toggling light/dark quickly.
+      themeAnimationDuration: Duration.zero,
 
       // Use GoRouter for navigation
       routerConfig: appRouter,

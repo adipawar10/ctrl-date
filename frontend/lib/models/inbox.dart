@@ -6,6 +6,8 @@ part 'inbox.g.dart';
 
 /// Message type enumeration for inbox messages
 enum MessageType {
+  @JsonValue('text')
+  text,
   @JsonValue('friend_request')
   friendRequest,
   @JsonValue('friend_accepted')

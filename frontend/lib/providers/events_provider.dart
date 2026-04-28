@@ -66,10 +66,13 @@ final upcomingEventsProvider = FutureProvider<List<Event>>((ref) async {
   );
 });
 
-/// Provider for a single event by ID
-final eventByIdProvider = FutureProvider.family<Event?, String>((ref, id) async {
+/// Provider for a single event by ID (current user only)
+final eventByIdProvider =
+    FutureProvider.family<Event?, String>((ref, id) async {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null || userId.isEmpty) return null;
   final database = ref.watch(databaseProvider);
-  return database.getEventById(id);
+  return database.getEventByIdForUser(id, userId);
 });
 
 /// Provider for events by status
@@ -110,28 +113,28 @@ class EventsNotifier extends StateNotifier<AsyncValue<List<Event>>> {
   StreamSubscription? _eventsSubscription;
 
   EventsNotifier(this._ref) : super(const AsyncValue.loading()) {
-    _loadEvents();
-    _subscribeToEvents();
+    _ref.listen<String?>(
+      currentUserIdProvider,
+      (previous, next) => _onUserIdChanged(next),
+      fireImmediately: true,
+    );
   }
 
   AppDatabase get _database => _ref.read(databaseProvider);
   ApiService get _api => _ref.read(apiServiceProvider);
   SyncService get _sync => _ref.read(syncServiceProvider);
 
-  Future<void> _loadEvents() async {
-    try {
-      final events = await _database.getAllEvents();
-      state = AsyncValue.data(events);
+  void _onUserIdChanged(String? userId) {
+    _eventsSubscription?.cancel();
+    _eventsSubscription = null;
 
-      // Trigger background sync
-      _sync.sync();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+    if (userId == null || userId.isEmpty) {
+      state = const AsyncValue.data([]);
+      return;
     }
-  }
 
-  void _subscribeToEvents() {
-    _eventsSubscription = _database.watchAllEvents().listen(
+    state = const AsyncValue.loading();
+    _eventsSubscription = _database.watchEventsForUserId(userId).listen(
       (events) {
         state = AsyncValue.data(events);
       },
@@ -139,6 +142,7 @@ class EventsNotifier extends StateNotifier<AsyncValue<List<Event>>> {
         state = AsyncValue.error(e, st);
       },
     );
+    _sync.sync();
   }
 
   /// Create a new event
@@ -159,8 +163,8 @@ class EventsNotifier extends StateNotifier<AsyncValue<List<Event>>> {
         'title': event.title,
         'description': event.description,
         'location': event.location,
-        'start_time': event.startTime.toIso8601String(),
-        'end_time': event.endTime.toIso8601String(),
+        'start_time': event.startTime.toUtc().toIso8601String(),
+        'end_time': event.endTime.toUtc().toIso8601String(),
         'all_day': event.isAllDay,
         'timezone': DateTime.now().timeZoneName,
         'is_locked': false,
@@ -170,25 +174,51 @@ class EventsNotifier extends StateNotifier<AsyncValue<List<Event>>> {
       };
 
       if (event.recurrenceRule != null) {
+        final r = event.recurrenceRule!;
         body['recurrence_rule'] = {
-          'frequency': event.recurrenceRule!.frequency.name,
-          'interval': event.recurrenceRule!.interval,
-          'by_week_day': event.recurrenceRule!.byWeekDay,
-          'by_month_day': event.recurrenceRule!.byMonthDay,
-          'by_month': event.recurrenceRule!.byMonth,
-          'count': event.recurrenceRule!.count,
-          'until': event.recurrenceRule!.until?.toIso8601String(),
+          'frequency': r.frequency.name,
+          'interval': r.interval,
+          'by_weekday': r.byWeekDay,
+          'by_monthday': r.byMonthDay,
+          'by_month': r.byMonth,
+          'count': r.count,
+          if (r.until != null)
+            'until_date': r.until!.toIso8601String().split('T').first,
         };
       }
 
       // Sync to server
       final response = await _api.post('/events', body: body);
+      var persistedEvent = event;
 
       if (response.isSuccess) {
-        await _database.markEventSynced(event.id);
+        final serverData = response.data;
+        final serverId = (serverData is Map<String, dynamic>)
+            ? serverData['id']?.toString()
+            : null;
+
+        // Server generates canonical IDs; reconcile local temporary ID so future
+        // updates/deletes target the correct backend record.
+        if (serverId != null && serverId.isNotEmpty && serverId != event.id) {
+          final existingServerRow = await _database.getEventById(serverId);
+          if (existingServerRow == null) {
+            persistedEvent = event.copyWith(
+              id: serverId,
+              isSynced: true,
+            );
+            await _database.insertEvent(persistedEvent);
+          }
+          await _database.deleteEvent(event.id);
+        } else {
+          await _database.markEventSynced(event.id);
+          persistedEvent = event.copyWith(isSynced: true);
+        }
+        // Pull expanded recurring instances so calendar reflects repeats immediately.
+        await _sync.sync();
+        return persistedEvent;
       }
 
-      return event;
+      return persistedEvent;
     } catch (e) {
       rethrow;
     }
@@ -216,8 +246,8 @@ class EventsNotifier extends StateNotifier<AsyncValue<List<Event>>> {
         'title': updatedEvent.title,
         'description': updatedEvent.description,
         'location': updatedEvent.location,
-        'start_time': updatedEvent.startTime.toIso8601String(),
-        'end_time': updatedEvent.endTime.toIso8601String(),
+        'start_time': updatedEvent.startTime.toUtc().toIso8601String(),
+        'end_time': updatedEvent.endTime.toUtc().toIso8601String(),
         'all_day': updatedEvent.isAllDay,
         'is_locked': false,
         'priority': priorityInt,
@@ -245,9 +275,9 @@ class EventsNotifier extends StateNotifier<AsyncValue<List<Event>>> {
   Future<void> deleteEvent(String eventId) async {
     try {
       await _database.deleteEvent(eventId);
-
       // Sync deletion to server
       await _api.delete('/events/$eventId');
+      await _sync.sync();
     } catch (e) {
       rethrow;
     }
@@ -338,9 +368,19 @@ class EventsNotifier extends StateNotifier<AsyncValue<List<Event>>> {
 
   /// Refresh events from server
   Future<void> refresh() async {
+    final userId = _ref.read(currentUserIdProvider);
+    if (userId == null || userId.isEmpty) {
+      state = const AsyncValue.data([]);
+      return;
+    }
     state = const AsyncValue.loading();
     await _sync.sync();
-    await _loadEvents();
+    try {
+      final events = await _database.getEventsForUserId(userId);
+      state = AsyncValue.data(events);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
   }
 
   @override

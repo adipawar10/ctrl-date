@@ -12,9 +12,8 @@ import 'auth_provider.dart';
 import 'events_provider.dart';
 
 /// Provider for all reflections
-final reflectionsProvider =
-    StateNotifierProvider<ReflectionsNotifier, AsyncValue<List<DailyReflection>>>(
-        (ref) {
+final reflectionsProvider = StateNotifierProvider<ReflectionsNotifier,
+    AsyncValue<List<DailyReflection>>>((ref) {
   return ReflectionsNotifier(ref);
 });
 
@@ -37,8 +36,7 @@ final todaysReflectionProvider = FutureProvider<DailyReflection?>((ref) async {
 
 /// Provider for reflections in a date range
 final reflectionsForDateRangeProvider =
-    FutureProvider.family<List<DailyReflection>, DateRange>(
-        (ref, range) async {
+    FutureProvider.family<List<DailyReflection>, DateRange>((ref, range) async {
   final reflectionsAsync = ref.watch(reflectionsProvider);
 
   return reflectionsAsync.maybeWhen(
@@ -53,11 +51,13 @@ final reflectionsForDateRangeProvider =
   );
 });
 
-/// Provider for a single reflection by ID
+/// Provider for a single reflection by ID (current user only)
 final reflectionByIdProvider =
     FutureProvider.family<DailyReflection?, String>((ref, id) async {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null || userId.isEmpty) return null;
   final database = ref.watch(databaseProvider);
-  return database.getReflectionById(id);
+  return database.getReflectionByIdForUser(id, userId);
 });
 
 /// Provider for reflection by date
@@ -78,14 +78,13 @@ final reflectionByDateProvider =
 });
 
 /// Provider for user's streak
-final streakProvider = StateNotifierProvider<StreakNotifier, AsyncValue<Streak>>(
-    (ref) {
+final streakProvider =
+    StateNotifierProvider<StreakNotifier, AsyncValue<Streak>>((ref) {
   return StreakNotifier(ref);
 });
 
 /// Provider for reflection statistics
-final reflectionStatsProvider =
-    FutureProvider<ReflectionStats>((ref) async {
+final reflectionStatsProvider = FutureProvider<ReflectionStats>((ref) async {
   final reflectionsAsync = ref.watch(reflectionsProvider);
   final streakAsync = ref.watch(streakProvider);
 
@@ -189,28 +188,61 @@ class ReflectionsNotifier
   StreamSubscription? _reflectionsSubscription;
 
   ReflectionsNotifier(this._ref) : super(const AsyncValue.loading()) {
-    _loadReflections();
-    _subscribeToReflections();
+    _ref.listen<String?>(
+      currentUserIdProvider,
+      (previous, next) => _onUserIdChanged(next),
+      fireImmediately: true,
+    );
   }
 
   AppDatabase get _database => _ref.read(databaseProvider);
   ApiService get _api => _ref.read(apiServiceProvider);
   SyncService get _sync => _ref.read(syncServiceProvider);
 
-  Future<void> _loadReflections() async {
-    try {
-      final reflections = await _database.getAllReflections();
-      state = AsyncValue.data(reflections);
+  Map<String, int> _deriveEventStatsFromTags(List<String> tags) {
+    var planned = 0;
+    var completed = 0;
+    var skipped = 0;
+    var partial = 0;
 
-      // Trigger background sync
-      _sync.sync();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+    for (final tag in tags) {
+      if (!tag.startsWith('event_status:')) continue;
+      final parts = tag.split(':');
+      if (parts.length < 3) continue;
+      planned += 1;
+      switch (parts[2]) {
+        case 'completed':
+          completed += 1;
+          break;
+        case 'skipped':
+          skipped += 1;
+          break;
+        case 'partial':
+          partial += 1;
+          break;
+      }
     }
+
+    return {
+      'events_planned': planned,
+      'events_completed': completed,
+      'events_skipped': skipped,
+      'events_partial': partial,
+    };
   }
 
-  void _subscribeToReflections() {
-    _reflectionsSubscription = _database.watchAllReflections().listen(
+  void _onUserIdChanged(String? userId) {
+    _reflectionsSubscription?.cancel();
+    _reflectionsSubscription = null;
+
+    if (userId == null || userId.isEmpty) {
+      state = const AsyncValue.data([]);
+      return;
+    }
+
+    state = const AsyncValue.loading();
+    _reflectionsSubscription =
+        _database.watchReflectionsForUserId(userId).listen(
       (reflections) {
         state = AsyncValue.data(reflections);
       },
@@ -218,13 +250,20 @@ class ReflectionsNotifier
         state = AsyncValue.error(e, st);
       },
     );
+    _sync.sync();
   }
 
   /// Create or update today's reflection
   Future<DailyReflection?> saveReflection(DailyReflection reflection) async {
     try {
-      // Check if exists
-      final existing = await _database.getReflectionByDate(reflection.date);
+      final userId = _ref.read(currentUserIdProvider);
+      if (userId == null || userId.isEmpty) return null;
+
+      // Check if exists (scoped to current user)
+      final existing = await _database.getReflectionByDateForUser(
+        reflection.date,
+        userId,
+      );
 
       DailyReflection reflectionToSave;
       if (existing != null) {
@@ -243,9 +282,16 @@ class ReflectionsNotifier
       }
 
       // Sync to server
+      final reflectionDate =
+          reflectionToSave.date.toIso8601String().split('T').first;
+      final eventStats = _deriveEventStatsFromTags(reflectionToSave.tags);
       final response = await _api.post(
-        '/reflections',
-        body: reflectionToSave.toJson(),
+        '/reflections/$reflectionDate',
+        body: {
+          'notes': reflectionToSave.notes,
+          'mood': reflectionToSave.mood?.value,
+          ...eventStats,
+        },
       );
 
       if (response.isSuccess) {
@@ -283,7 +329,8 @@ class ReflectionsNotifier
               false) ||
           (reflection.accomplishments?.toLowerCase().contains(lowerQuery) ??
               false) ||
-          (reflection.challenges?.toLowerCase().contains(lowerQuery) ?? false) ||
+          (reflection.challenges?.toLowerCase().contains(lowerQuery) ??
+              false) ||
           (reflection.learnings?.toLowerCase().contains(lowerQuery) ?? false) ||
           (reflection.notes?.toLowerCase().contains(lowerQuery) ?? false) ||
           reflection.tags.any((tag) => tag.toLowerCase().contains(lowerQuery));
@@ -292,9 +339,19 @@ class ReflectionsNotifier
 
   /// Refresh reflections
   Future<void> refresh() async {
+    final userId = _ref.read(currentUserIdProvider);
+    if (userId == null || userId.isEmpty) {
+      state = const AsyncValue.data([]);
+      return;
+    }
     state = const AsyncValue.loading();
     await _sync.sync();
-    await _loadReflections();
+    try {
+      final reflections = await _database.getReflectionsForUserId(userId);
+      state = AsyncValue.data(reflections);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
   }
 
   @override
@@ -317,10 +374,27 @@ class StreakNotifier extends StateNotifier<AsyncValue<Streak>> {
 
   Future<void> _loadStreak() async {
     try {
-      final response = await _api.get<Map<String, dynamic>>('/streaks/me');
+      final response =
+          await _api.get<Map<String, dynamic>>('/reflections/streaks');
 
       if (response.isSuccess && response.data != null) {
-        final streak = Streak.fromJson(response.data!);
+        final streaks = (response.data!['streaks'] as List?) ?? const [];
+        final daily = streaks.whereType<Map<String, dynamic>>().firstWhere(
+              (s) => (s['streak_type']?.toString() ?? '') == 'daily_completion',
+              orElse: () => const <String, dynamic>{},
+            );
+        final streak = Streak(
+          id: (daily['id'] ?? '').toString(),
+          userId: (daily['user_id'] ?? '').toString(),
+          currentStreak: (daily['current_count'] as num?)?.toInt() ?? 0,
+          longestStreak: (daily['longest_count'] as num?)?.toInt() ?? 0,
+          lastReflectionDate: daily['last_completed_date'] != null
+              ? DateTime.tryParse(daily['last_completed_date'].toString())
+              : null,
+          updatedAt: daily['updated_at'] != null
+              ? DateTime.tryParse(daily['updated_at'].toString())
+              : null,
+        );
         state = AsyncValue.data(streak);
       } else {
         // Create default streak
@@ -338,22 +412,11 @@ class StreakNotifier extends StateNotifier<AsyncValue<Streak>> {
 
   /// Update streak after a reflection is saved
   Future<void> updateAfterReflection() async {
-    try {
-      final response = await _api.post<Map<String, dynamic>>('/streaks/update');
-
-      if (response.isSuccess && response.data != null) {
-        final newStreak = Streak.fromJson(response.data!);
-        final oldStreak = state.valueOrNull;
-
-        state = AsyncValue.data(newStreak);
-
-        // Check for milestone notifications
-        if (oldStreak != null) {
-          _checkMilestones(oldStreak.currentStreak, newStreak.currentStreak);
-        }
-      }
-    } catch (e) {
-      // Silently fail - streak will be updated on next sync
+    final oldStreak = state.valueOrNull;
+    await _loadStreak();
+    final newStreak = state.valueOrNull;
+    if (oldStreak != null && newStreak != null) {
+      _checkMilestones(oldStreak.currentStreak, newStreak.currentStreak);
     }
   }
 

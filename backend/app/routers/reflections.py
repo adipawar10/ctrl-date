@@ -44,24 +44,38 @@ async def create_or_update_reflection(
     Auto-calculates completion stats from events.
     Updates streak accordingly.
     """
-    # Calculate event stats for the day
-    day_start = datetime.combine(reflection_date, datetime.min.time())
-    day_end = datetime.combine(reflection_date, datetime.max.time())
+    # Prefer explicit stats from reflection payload (user-selected Done/Partial/Skip).
+    if (
+        reflection.events_planned is not None
+        and reflection.events_completed is not None
+        and reflection.events_skipped is not None
+        and reflection.events_partial is not None
+    ):
+        stats = {
+            "events_planned": reflection.events_planned,
+            "events_completed": reflection.events_completed,
+            "events_skipped": reflection.events_skipped,
+            "events_partial": reflection.events_partial,
+        }
+    else:
+        # Fallback to event table statuses when explicit reflection stats are unavailable.
+        day_start = datetime.combine(reflection_date, datetime.min.time())
+        day_end = datetime.combine(reflection_date, datetime.max.time())
 
-    events_response = supabase.table("events").select("status").eq(
-        "owner_id", str(user.id)
-    ).is_("deleted_at", "null").gte(
-        "start_time", day_start.isoformat()
-    ).lt("start_time", day_end.isoformat()).execute()
+        events_response = supabase.table("events").select("status").eq(
+            "owner_id", str(user.id)
+        ).is_("deleted_at", "null").gte(
+            "start_time", day_start.isoformat()
+        ).lt("start_time", day_end.isoformat()).execute()
 
-    events = events_response.data or []
+        events = events_response.data or []
 
-    stats = {
-        "events_planned": len(events),
-        "events_completed": sum(1 for e in events if e["status"] == EventStatus.COMPLETED.value),
-        "events_skipped": sum(1 for e in events if e["status"] == EventStatus.SKIPPED.value),
-        "events_partial": sum(1 for e in events if e["status"] == EventStatus.PARTIAL.value),
-    }
+        stats = {
+            "events_planned": len(events),
+            "events_completed": sum(1 for e in events if e["status"] == EventStatus.COMPLETED.value),
+            "events_skipped": sum(1 for e in events if e["status"] == EventStatus.SKIPPED.value),
+            "events_partial": sum(1 for e in events if e["status"] == EventStatus.PARTIAL.value),
+        }
 
     # Calculate completion rate
     completion_rate = 0.0
@@ -72,12 +86,28 @@ async def create_or_update_reflection(
     # Get user's streak settings
     streak_response = supabase.table("streaks").select("*").eq(
         "user_id", str(user.id)
-    ).eq("streak_type", "daily_completion").single().execute()
+    ).eq("streak_type", "daily_completion").limit(1).execute()
 
-    streak = streak_response.data
-    threshold = streak["completion_threshold"] if streak else 0.80
-
-    is_streak_day = completion_rate >= threshold and stats["events_planned"] > 0
+    streak = (streak_response.data or [None])[0]
+    if not streak:
+        streak = {
+            "id": str(uuid4()),
+            "user_id": str(user.id),
+            "streak_type": "daily_completion",
+            "current_count": 0,
+            "longest_count": 0,
+            "last_completed_date": None,
+            "completion_threshold": 1.0,
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        supabase.table("streaks").insert(streak).execute()
+    # Strict rule: a streak day requires 100% completion.
+    is_streak_day = (
+        stats["events_planned"] > 0
+        and stats["events_completed"] == stats["events_planned"]
+        and stats["events_partial"] == 0
+        and stats["events_skipped"] == 0
+    )
 
     # Check if reflection exists
     existing = supabase.table("daily_reflections").select("id").eq(
@@ -125,74 +155,72 @@ async def _update_streak(
     if not streak:
         return
 
-    last_completed = streak.get("last_completed_date")
-    if last_completed:
-        last_completed = date.fromisoformat(last_completed)
+    current_count, longest_count, last_completed = await _recalculate_streak_metrics(
+        user_id
+    )
 
-    current_count = streak["current_count"]
-    longest_count = streak["longest_count"]
+    # Preserve historical longest streak if it was larger than what we recomputed.
+    longest_count = max(streak.get("longest_count", 0), longest_count)
 
-    if is_streak_day:
-        if last_completed is None:
-            # First streak day
-            current_count = 1
-        elif reflection_date == last_completed:
-            # Same day, no change
-            pass
-        elif reflection_date == last_completed + timedelta(days=1):
-            # Consecutive day
-            current_count += 1
-        elif reflection_date > last_completed + timedelta(days=1):
-            # Streak broken, start new
-            current_count = 1
-        else:
-            # Past date update, recalculate streak
-            current_count = await _recalculate_streak(user_id, streak["id"])
+    update_data = {
+        "current_count": current_count,
+        "longest_count": longest_count,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    update_data["last_completed_date"] = (
+        last_completed.isoformat() if last_completed else None
+    )
 
-        # Update longest if needed
-        longest_count = max(longest_count, current_count)
-
-        supabase.table("streaks").update({
-            "current_count": current_count,
-            "longest_count": longest_count,
-            "last_completed_date": reflection_date.isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
-        }).eq("id", streak["id"]).execute()
-
-    elif last_completed and reflection_date > last_completed + timedelta(days=1):
-        # Non-streak day and we missed days - reset streak
-        supabase.table("streaks").update({
-            "current_count": 0,
-            "updated_at": datetime.utcnow().isoformat(),
-        }).eq("id", streak["id"]).execute()
+    supabase.table("streaks").update(update_data).eq("id", streak["id"]).execute()
 
 
-async def _recalculate_streak(user_id: UUID, streak_id: str) -> int:
-    """Recalculate streak from reflection history."""
-    # Get recent reflections ordered by date
+async def _recalculate_streak_metrics(user_id: UUID) -> tuple[int, int, Optional[date]]:
+    """Recalculate current and longest streak from reflection history."""
     response = supabase.table("daily_reflections").select(
         "reflection_date, is_streak_day"
-    ).eq("user_id", str(user_id)).eq(
-        "is_streak_day", True
-    ).order("reflection_date", desc=True).limit(365).execute()
+    ).eq("user_id", str(user_id)).order("reflection_date", desc=False).limit(365).execute()
 
     if not response.data:
-        return 0
+        return 0, 0, None
 
     reflections = response.data
-    streak_count = 0
-    expected_date = date.today()
+    status_by_day = {
+        date.fromisoformat(ref["reflection_date"]): bool(ref.get("is_streak_day"))
+        for ref in reflections
+    }
+    all_days = sorted(status_by_day.keys())
 
-    for ref in reflections:
-        ref_date = date.fromisoformat(ref["reflection_date"])
-        if ref_date == expected_date:
-            streak_count += 1
-            expected_date -= timedelta(days=1)
-        elif ref_date < expected_date:
-            # Gap in streak
-            break
+    # Compute longest historical streak.
+    longest_streak = 0
+    running = 0
+    prev_day: Optional[date] = None
+    for day in all_days:
+        is_streak_day = status_by_day[day]
+        if is_streak_day:
+            if prev_day is not None and day == prev_day + timedelta(days=1):
+                running += 1
+            else:
+                running = 1
+            longest_streak = max(longest_streak, running)
+        else:
+            running = 0
+        prev_day = day
 
-    return streak_count
+    # Current streak is defined on the latest reflected day.
+    latest_day = all_days[-1]
+    if not status_by_day[latest_day]:
+        current_streak = 0
+    else:
+        current_streak = 1
+        cursor = latest_day - timedelta(days=1)
+        while status_by_day.get(cursor) is True:
+            current_streak += 1
+            cursor -= timedelta(days=1)
+
+    streak_days = [d for d, ok in status_by_day.items() if ok]
+    last_completed = max(streak_days) if streak_days else None
+
+    return current_streak, longest_streak, last_completed
 
 
 @router.get("/stats")

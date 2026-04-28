@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/api_endpoints.dart';
 import '../utils/constants.dart';
 
 /// HTTP client for backend API communication
@@ -38,13 +38,10 @@ class ApiService {
   }) async {
     try {
       final uri = _buildUri(endpoint, queryParams);
-      final response = await _httpClient
-          .getUrl(uri)
-          .then((request) {
-            _baseHeaders.forEach(request.headers.add);
-            return request.close();
-          })
-          .timeout(AppConstants.apiTimeout);
+      final response = await _httpClient.getUrl(uri).then((request) {
+        _baseHeaders.forEach(request.headers.add);
+        return request.close();
+      }).timeout(AppConstants.apiTimeout);
 
       return _handleResponse<T>(response, fromJson);
     } catch (e) {
@@ -137,7 +134,7 @@ class ApiService {
 
   /// Build the full URI for an endpoint
   Uri _buildUri(String endpoint, [Map<String, String>? queryParams]) {
-    final baseUri = Uri.parse(AppConstants.apiBaseUrl);
+    final baseUri = Uri.parse(ApiEndpoints.baseUrl);
     return Uri(
       scheme: baseUri.scheme,
       host: baseUri.host,
@@ -173,7 +170,15 @@ class ApiService {
     String errorMessage;
     try {
       final errorJson = jsonDecode(responseBody);
-      errorMessage = errorJson['message'] ?? errorJson['error'] ?? 'Unknown error';
+      final detail = errorJson['detail'];
+      if (detail is String) {
+        errorMessage = detail;
+      } else if (detail is List && detail.isNotEmpty) {
+        errorMessage = detail.first.toString();
+      } else {
+        errorMessage =
+            errorJson['message'] ?? errorJson['error'] ?? 'Unknown error';
+      }
     } catch (_) {
       errorMessage = responseBody.isNotEmpty ? responseBody : 'Request failed';
     }
@@ -196,9 +201,20 @@ class ApiService {
     }
 
     if (error is SocketException) {
+      final msg = error.message;
+      final refused =
+          msg.contains('refused') || msg.contains('Connection refused');
+      if (refused) {
+        return ApiError(
+          statusCode: 0,
+          message: 'Cannot reach the API at ${ApiEndpoints.baseUrl}. '
+              'Start the backend on your Mac (e.g. uvicorn on port 8000), then try again.',
+        );
+      }
       return ApiError(
         statusCode: 0,
-        message: 'No internet connection. Please check your network.',
+        message:
+            'Network error ($msg). On a real device, set API_BASE_URL to your Mac\'s LAN IP.',
       );
     }
 

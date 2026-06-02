@@ -6,11 +6,12 @@ A cross-platform productivity application that combines calendar-first planning 
 
 | Name | Email |
 |------|-------|
+| Adi Pawar | apawar5@student.gsu.edu |
 | Ibe Mohammed Ali | imohammedali1@student.gsu.edu |
 | Laila Hunt | lhunt24@student.gsu.edu |
 | Nazifa Chowdhury | nchowdhury15@student.gsu.edu |
 | Benjamin Weyant | bweyant1@student.gsu.edu |
-| Adi Pawar | apawar5@student.gsu.edu |
+
 
 ## Overview
 

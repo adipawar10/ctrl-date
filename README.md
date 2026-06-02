@@ -1,6 +1,6 @@
 # ctrl^date (Ctrl+Shift+Date)
 
-A cross-platform productivity application that combines calendar-first planning with intelligent scheduling assistance, daily reflection, and lightweight collaboration.
+ctrl^date is an offline-first, cross-platform productivity application that combines calendar-first planning, AI scheduling assistance, daily reflection, and secure collaboration into a single minimalist system. It allows users to balance fixed commitments with flexible tasks, lock in non-negotiable events, build productivity streaks, and receive intelligent LLM-powered suggestions to optimize their schedules. The application is designed to run seamlessly on iOS, Android, and macOS, featuring robust local synchronization and an end-to-end encrypted inbox for group planning.
 
 ## Team
 
